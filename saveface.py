@@ -20,42 +20,40 @@ from boundinnerclasses import BoundInnerClass
 
 class SaveFace:
 
-    """Summary
+    """
     
     Attributes:
-        args (dict): Description
-        fbjson (dict): Description
-        filename (TYPE): Description
-        images_total (int): Description
-        imgpath_element (list): Description
-        num_images (int): Description
-        num_pages (int): Description
+        args (dict): args that get passed in from argparser
+        fbjson (dict): dict representation of json string
+        filename (string): filename to store data in 
         O_Auth_tkn (TYPE): Description
     """
     
     def __init__(self):
-        """Summary
         """
-        self.num_pages = 0
-        self.num_images = 0
-        self.images_total = 0
-        self.fbjson = {}
-        self.imgpath_element = []
-        self.args = {}
+        	initialise class variables
+        """
+        self._num_pages = 0
+        self._num_images = 0
+        self._images_total = 0
+        self._imgpath_element = []
         self._compact = False
         self._indent = 4
         self._depth = None
         self._width = 80
+
+        self.fbjson = {}
+        self.args = {}
         self.O_Auth_tkn = None
 
     def process_args(self, args):
-        """Summary
-        
+        """
+        	Internal function used by script when standalone
         Args:
-            args (TYPE): Description
+            args (dict): args from argparser
         
         Raises:
-            ValueError: Description
+            ValueError: if O_Auth_tkn is not set
         """
         self.args = args
         if self.args.O_Auth_tkn:
@@ -83,7 +81,8 @@ class SaveFace:
             self.__write_(result)
 
     def __prepare_pprint_(self):
-        """Summary
+        """
+			prepares the pprint options string
         """
         for j in self.args.pprint_opts.split(','):
             j = j.split('=')
@@ -113,13 +112,13 @@ class SaveFace:
                     pass
 
     def get_from_graph(self, O_Auth_tkn = None):
-        """Summary
-        
+        """
+        	Gets the json string from facebook
         Args:
             O_Auth_tkn (None, optional): Description
         
         Raises:
-            ValueError: Description
+            ValueError: Raised if O_Auth_tkn is not set
         """
         if O_Auth_tkn is not None:
             self.O_Auth_tkn = O_Auth_tkn
@@ -154,14 +153,17 @@ class SaveFace:
         self.fbjson = myjson
 
     def __write_(self):
-        """Summary
+        """
+        	writes data to file
         """
         if self.args.output_type is not "stdout":
             with open(self.args.output_type, "w") as f:
                 f.write(self.results)
 
     def get_images(self):
-        """Summary
+        """
+        	gets the image urls from the received data
+        	and calls private function download
         """
         xmlstring = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
         self._root = ET.fromstring(xmlstring)
@@ -176,22 +178,22 @@ class SaveFace:
     @BoundInnerClass #http://code.activestate.com/recipes/577070-bound-inner-classes/
     class DownloadThread(threading.Thread):
 
-        """Summary
-        
+        """
+        	A bound inner thread class        
         Attributes:
-            daemon (bool): Description
-            destfolder (TYPE): Description
-            outer (TYPE): Description
-            queue (TYPE): Description
+            daemon (bool): whether to run threading in deamon mode
+            destfolder (string): the destination folder for images 
+            outer (object): the outer class instance
+            queue (Queue): thread queue
         """
         
         def __init__(self, outer, queue, destfolder):
-            """Summary
-            
+            """
+            	initialise variables            
             Args:
-                outer (TYPE): Description
-                queue (TYPE): Description
-                destfolder (TYPE): Description
+                outer (object): the outer class instance
+                queue (Queue): thread queue
+                destfolder (string): destination folder for images
             """
             super(outer.DownloadThread, self).__init__()
             self.queue = queue
@@ -200,7 +202,8 @@ class SaveFace:
             self.outer = outer
 
         def run(self):
-            """Summary
+            """
+            	runs the threads
             """
             while True:
                 el = self.queue.get()
@@ -213,26 +216,27 @@ class SaveFace:
                 self.queue.task_done()
 
         def download_img(self, outer, el):
-            """Summary
-            
+            """
+            	downloads images, makes filenames, prints download progress
+            	makes filename  mostly semi-psuedocode currently
             Args:
-                outer (TYPE): Description
-                el (TYPE): Description
+                outer (object): Outer class instance
+                el (ElementTree<node>): element   TODO - check type
             """
             print "[%s] Downloading %s -> %s" % (self.ident, el.nodeValue, self.destfolder)
             try:
                 img = urllib.FancyURLopener(el.nextSibling.nodeValue, self.destfolder)
                 imgtype = img.info().getsubtype()
-                name = str(outer.num_images) + '.' + imgtype
-                buf = img.read()
+                name = str(outer._num_images) + '.' + imgtype
                 name = name.split('/')[-1]
-                dest = os.path.join(self.destfolder, name)
-                outer.imgpath_element.push((self.destfolder, el))
-                downloaded_image = file(dest, "wb")
+                dest_path = os.path.join(self.destfolder, name)
+                outer.imgpath_element.push((dest_path, el))
+                buf = img.read()
+                downloaded_image = file(dest_path, "wb")
                 downloaded_image.write(buf)
                 downloaded_image.close()
-                outer.num_images += 1
-                print_progress(outer.num_images, outer.images_total)
+                outer._num_images += 1
+                print_progress(outer._num_images, outer._images_total)
                 img.close()
             except (urllib.ContentTooShortError, IOError) as e:
                 print(type(e))
@@ -240,11 +244,11 @@ class SaveFace:
                 print(e)    
 
     def __download_(self, destfolder, numthreads=4):
-        """Summary
-        
+        """
+            start threads downloading
         Args:
-            destfolder (TYPE): Description
-            numthreads (int, optional): Description
+            destfolder (string): destination image folder name
+            numthreads (int, optional): number of threads
         """
         queue = Queue()
         for el in self.elements:
@@ -270,14 +274,6 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
         suffix      - Optional  : suffix string (Str)
         decimals    - Optional  : positive number of decimals in percent complete (Int)
         bar_length  - Optional  : character length of bar (Int)
-    
-    Args:
-        iteration (TYPE): Description
-        total (TYPE): Description
-        prefix (str, optional): Description
-        suffix (str, optional): Description
-        decimals (int, optional): Description
-        bar_length (int, optional): Description
     """
     str_format = "{0:." + str(decimals) + "f}"
     percents = str_format.format(100 * (iteration / float(total)))
