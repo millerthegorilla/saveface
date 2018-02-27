@@ -1,4 +1,6 @@
 #! /usr/bin/python
+"""Summary
+"""
 # This Python file uses the following encoding: utf-8
 from Queue import Queue
 import argparse
@@ -17,7 +19,23 @@ from xml.etree import ElementTree as ET
 from boundinnerclasses import BoundInnerClass
 
 class SaveFace:
+
+    """Summary
+    
+    Attributes:
+        args (dict): Description
+        fbjson (dict): Description
+        filename (TYPE): Description
+        images_total (int): Description
+        imgpath_element (list): Description
+        num_images (int): Description
+        num_pages (int): Description
+        O_Auth_tkn (TYPE): Description
+    """
+    
     def __init__(self):
+        """Summary
+        """
         self.num_pages = 0
         self.num_images = 0
         self.images_total = 0
@@ -31,6 +49,14 @@ class SaveFace:
         self.O_Auth_tkn = None
 
     def process_args(self, args):
+        """Summary
+        
+        Args:
+            args (TYPE): Description
+        
+        Raises:
+            ValueError: Description
+        """
         self.args = args
         if self.args.O_Auth_tkn:
             self.get_from_graph(self.args.O_Auth_tkn)
@@ -57,6 +83,8 @@ class SaveFace:
             self.__write_(result)
 
     def __prepare_pprint_(self):
+        """Summary
+        """
         for j in self.args.pprint_opts.split(','):
             j = j.split('=')
             if j[0] == 'compact':
@@ -85,6 +113,14 @@ class SaveFace:
                     pass
 
     def get_from_graph(self, O_Auth_tkn = None):
+        """Summary
+        
+        Args:
+            O_Auth_tkn (None, optional): Description
+        
+        Raises:
+            ValueError: Description
+        """
         if O_Auth_tkn is not None:
             self.O_Auth_tkn = O_Auth_tkn
 
@@ -118,11 +154,15 @@ class SaveFace:
         self.fbjson = myjson
 
     def __write_(self):
+        """Summary
+        """
         if self.args.output_type is not "stdout":
             with open(self.args.output_type, "w") as f:
                 f.write(self.results)
 
     def get_images(self):
+        """Summary
+        """
         xmlstring = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
         self._root = ET.fromstring(xmlstring)
         els = self._root.findall('image')
@@ -135,7 +175,24 @@ class SaveFace:
 
     @BoundInnerClass #http://code.activestate.com/recipes/577070-bound-inner-classes/
     class DownloadThread(threading.Thread):
+
+        """Summary
+        
+        Attributes:
+            daemon (bool): Description
+            destfolder (TYPE): Description
+            outer (TYPE): Description
+            queue (TYPE): Description
+        """
+        
         def __init__(self, outer, queue, destfolder):
+            """Summary
+            
+            Args:
+                outer (TYPE): Description
+                queue (TYPE): Description
+                destfolder (TYPE): Description
+            """
             super(outer.DownloadThread, self).__init__()
             self.queue = queue
             self.destfolder = destfolder
@@ -143,6 +200,8 @@ class SaveFace:
             self.outer = outer
 
         def run(self):
+            """Summary
+            """
             while True:
                 el = self.queue.get()
                 try:
@@ -154,6 +213,12 @@ class SaveFace:
                 self.queue.task_done()
 
         def download_img(self, outer, el):
+            """Summary
+            
+            Args:
+                outer (TYPE): Description
+                el (TYPE): Description
+            """
             print "[%s] Downloading %s -> %s" % (self.ident, el.nodeValue, self.destfolder)
             try:
                 img = urllib.FancyURLopener(el.nextSibling.nodeValue, self.destfolder)
@@ -175,6 +240,12 @@ class SaveFace:
                 print(e)    
 
     def __download_(self, destfolder, numthreads=4):
+        """Summary
+        
+        Args:
+            destfolder (TYPE): Description
+            numthreads (int, optional): Description
+        """
         queue = Queue()
         for el in self.elements:
             queue.put(el)
@@ -199,6 +270,14 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
         suffix      - Optional  : suffix string (Str)
         decimals    - Optional  : positive number of decimals in percent complete (Int)
         bar_length  - Optional  : character length of bar (Int)
+    
+    Args:
+        iteration (TYPE): Description
+        total (TYPE): Description
+        prefix (str, optional): Description
+        suffix (str, optional): Description
+        decimals (int, optional): Description
+        bar_length (int, optional): Description
     """
     str_format = "{0:." + str(decimals) + "f}"
     percents = str_format.format(100 * (iteration / float(total)))
