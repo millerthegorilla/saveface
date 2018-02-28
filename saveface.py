@@ -1,7 +1,7 @@
 #! /usr/bin/python
+# -*- coding: UTF-8 -*-
 """Summary
 """
-# This Python file uses the following encoding: utf-8
 from Queue import Queue
 import argparse
 import os
@@ -21,7 +21,6 @@ from boundinnerclasses import BoundInnerClass
 class SaveFace:
 
     """
-    
     Attributes:
         args (dict): args that get passed in from argparser
         fbjson (dict): dict representation of json string
@@ -31,7 +30,7 @@ class SaveFace:
     
     def __init__(self):
         """
-        	initialise class variables
+            initialise class variables
         """
         self._num_pages = 0
         self._num_images = 0
@@ -48,7 +47,7 @@ class SaveFace:
 
     def process_args(self, args):
         """
-        	Internal function used by script when standalone
+            Internal function used by script when standalone
         Args:
             args (dict): args from argparser
         
@@ -65,8 +64,8 @@ class SaveFace:
             result = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
         elif self.args.format == 'pjson':
             self.__prepare_pprint_()
-            result = pprint.pformat(self.fbjson, indent=self._indent,
-                width=self._width, depth=self._depth) #compact is not yet instantiated compact=self._compact)
+            result = pprint.pformat(self.fbjson, indent=self.args.pprintopts['indent'], 
+                depth=self.args.pprintopts['depth'], width=self.args.pprintopts['width']) #compact is not yet instantiated compact=self._compact)
         else:
             result = self.fbjson
 
@@ -82,38 +81,26 @@ class SaveFace:
 
     def __prepare_pprint_(self):
         """
-			prepares the pprint options string
+            prepares the pprint options string
         """
-        for j in self.args.pprint_opts.split(','):
-            j = j.split('=')
-            if j[0] == 'compact':
-                try:
-                    self._compact = bool(j[1])
-                except:
-                    self._compact = False
-                    pass
-            if j[0] == 'indent':
-                try:
-                    self._indent = int(j[1])
-                except:
-                    self._indent = 4
-                    pass
-            if j[0] == 'width':
-                try:
-                    self._width = int(j[1])
-                except:
-                    self._width = 80
-                    pass
-            if j[0] == 'depth':
-                try:
-                    self._depth = int(j[1])
-                except:
-                    self._depth = None
-                    pass
+        SUPPORTED_TYPES = ['indent','width','depth']
+        self.args.pprintopts = {}
+        for a in args.pprint_opts:
+            b = a.split('=')
+            print(b[1])
+            if b[0] not in SUPPORTED_TYPES:
+                raise ValueError('Unsupported type "%s". Supported types are %s' % (b[0], ', '.join(SUPPORTED_TYPES)))
+            if b[1] != 'None':
+                if b[1] == 'bool':
+                    self.args.pprintopts[b[0]] = bool(b[1])
+                else:
+                    self.args.pprintopts[b[0]] = int(b[1])
+            else:
+                self.args.pprintopts[b[0]] = None
 
     def get_from_graph(self, O_Auth_tkn = None):
         """
-        	Gets the json string from facebook
+            Gets the json string from facebook
         Args:
             O_Auth_tkn (None, optional): Description
         
@@ -138,7 +125,7 @@ class SaveFace:
             sys.stdout.write("getting posts from %s\n" % (myjson['data'][-1]['created_time']))
             while(True):
                 posts = requests.get(myjson.pop('paging')['next']).json()
-                self.num_pages = self.num_pages + 1
+                self._num_pages = self._num_pages + 1
                 if len(posts['data']):
                     sys.stdout.write("getting posts from %s\n" % (posts['data'][-1]['created_time']))
                     myjson = dict(myjson, **posts)
@@ -149,12 +136,12 @@ class SaveFace:
                 print(e.args)
                 print(e)
 
-        print("received %s pages" % (self.num_pages))
+        print("received %s pages" % (self._num_pages))
         self.fbjson = myjson
 
     def __write_(self):
         """
-        	writes data to file
+            writes data to file
         """
         if self.args.output_type is not "stdout":
             with open(self.args.output_type, "w") as f:
@@ -162,16 +149,16 @@ class SaveFace:
 
     def get_images(self):
         """
-        	gets the image urls from the received data
-        	and calls private function download
+            gets the image urls from the received data
+            and calls private function download
         """
         xmlstring = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
         self._root = ET.fromstring(xmlstring)
-        els = self._root.findall('image')
         elements = []
+        els = self._root.findall('image')
         for el in els:
             elements.push(el.find('src')[0])
-        els = xmlstring.findall('full_picture')
+        els = self._root.findall('full_picture')
         elements = elements + els
         self.__download_(elements)
 
@@ -179,89 +166,90 @@ class SaveFace:
     class DownloadThread(threading.Thread):
 
         """
-        	A bound inner thread class        
-        Attributes:
-            daemon (bool): whether to run threading in deamon mode
-            destfolder (string): the destination folder for images 
-            outer (object): the outer class instance
-            queue (Queue): thread queue
+            A bound inner thread class        
         """
         
-        def __init__(self, outer, queue, destfolder):
+        def __init__(self, queue):
             """
-            	initialise variables            
+                initialise variables            
             Args:
                 outer (object): the outer class instance
                 queue (Queue): thread queue
-                destfolder (string): destination folder for images
             """
             super(outer.DownloadThread, self).__init__()
-            self.queue = queue
-            self.destfolder = destfolder
-            self.daemon = True
-            self.outer = outer
+            self._queue = queue
+            self._destfolder = outer.args.imgfolder
+            self._daemon = True
+            self._outer = outer
 
         def run(self):
             """
-            	runs the threads
+                runs the threads
             """
             while True:
-                el = self.queue.get()
+                el = self._queue.get()
                 try:
-                    self.download_img(el)
+                    self.__download_img_(el)
                 except Exception as e:
                     print(type(e))
                     print(e.args)
                     print(e)
-                self.queue.task_done()
+                self._queue.task_done()
 
-        def download_img(self, outer, el):
+        def __download_img_(self, outer, el):
             """
-            	downloads images, makes filenames, prints download progress
-            	makes filename  mostly semi-psuedocode currently
+                downloads images, makes filenames, prints download progress
+                makes filename  mostly semi-psuedocode currently
             Args:
                 outer (object): Outer class instance
                 el (ElementTree<node>): element   TODO - check type
             """
-            print "[%s] Downloading %s -> %s" % (self.ident, el.nodeValue, self.destfolder)
+            print "[%s] Downloading %s -> %s" % (self.ident, el.nodeValue, self._destfolder)
             try:
-                img = urllib.FancyURLopener(el.nextSibling.nodeValue, self.destfolder)
+                img = urllib.FancyURLopener(el.nextSibling.nodeValue, self._destfolder)
+            #get file tyoe
                 imgtype = img.info().getsubtype()
+            #construct name
                 name = str(outer._num_images) + '.' + imgtype
                 name = name.split('/')[-1]
-                dest_path = os.path.join(self.destfolder, name)
+            #construct path
+                dest_path = os.path.join(self._destfolder, name)
+            #store path and element to set path in xml later - may need thread.lock
                 outer.imgpath_element.push((dest_path, el))
+            #read file data from urllib stream
                 buf = img.read()
+            #write file data
                 downloaded_image = file(dest_path, "wb")
                 downloaded_image.write(buf)
                 downloaded_image.close()
+            #close urllib stream
+                img.close()
+            #increment counter for name and print progress
                 outer._num_images += 1
                 print_progress(outer._num_images, outer._images_total)
-                img.close()
             except (urllib.ContentTooShortError, IOError) as e:
                 print(type(e))
                 print(e.args)
                 print(e)    
 
-    def __download_(self, destfolder, numthreads=4):
+    def __download_(self, elements, numthreads=4):
         """
             start threads downloading
         Args:
-            destfolder (string): destination image folder name
+            elements (list): a list of elements
             numthreads (int, optional): number of threads
         """
         queue = Queue()
-        for el in self.elements:
+        for el in elements:
             queue.put(el)
 
-        self.images_total = len(self.elements)
+        self._images_total = len(elements)
 
         for i in range(numthreads):
-            t = self.DownloadThread(queue, destfolder)
+            t = self.DownloadThread(queue)
             t.start()
 
         queue.join()
-
 
 # Print iterations progress
 def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
@@ -292,7 +280,7 @@ if __name__ == "__main__":
                      {created_time,from,message,comments\
                      {created_time,from,message},attachment},full_picture}"
     
-    parser = argparse.ArgumentParser(description="Download facebook posts,comments,images etc.\n\
+    parser = argparse.ArgumentParser(epilog="Saving Face with saveface.py", description="Download facebook posts,comments,images etc.\n\
         Default request string is :\n" + defaultqstring)
     
     parser.add_argument('-a --auth_tkn', metavar='facebook auth token', type=str, required=True, nargs='?', 
@@ -317,8 +305,7 @@ if __name__ == "__main__":
         dest='imgfolder')
     parser.add_argument('-p --pprint_options', metavar='pprint options', type=str, required=False, nargs='*',
         default='indent=4, width=80, depth=None, compact=False', help="Optional. Options string for pprint module.\n\
-        Parameters must be named key=value ie indent=4.\n\
-        Defaults to: 'indent=4, width=80, depth=None, compact=False'",
+        Parameters must be named key=value with no comma ie indent=4 depth=80.",
         dest='pprint_opts')
 
     args = parser.parse_args()
