@@ -40,6 +40,7 @@ class SaveFace:
         self._indent = 4
         self._depth = None
         self._width = 80
+        self._graph = None
 
         self.fbjson = {}
         self.args = {}
@@ -55,10 +56,9 @@ class SaveFace:
             ValueError: if O_Auth_tkn is not set
         """
         self.args = args
-        if self.args.O_Auth_tkn:
-            self.get_from_graph(self.args.O_Auth_tkn)
-        else:
-            raise ValueError("O_Auth_tkn must be set")
+
+        self.set_graph(args.O_Auth_tkn)
+        result = self.get_from_graph()
 
         if self.args.format == 'xml':
             result = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
@@ -69,15 +69,20 @@ class SaveFace:
         else:
             result = self.fbjson
 
-        if self.args.images == True:
-            self.get_images()
-            #self._root
-
-        if self.args.output_type == 'stdout':
+        if self.args.output == 'stdout':
             print(result)
         else:
-            self.filename = self.args.output_type
+            self.filename = self.args.output
             self.__write_(result)
+
+        #images
+        if self.args.images == True:
+            self.get_images()
+            #exchange the text in the url nodes from the node list
+            #with local filepaths
+            #TODO
+
+            #self._root
 
     def __prepare_pprint_(self):
         """
@@ -87,7 +92,6 @@ class SaveFace:
         self.args.pprintopts = {}
         for a in args.pprint_opts:
             b = a.split('=')
-            print(b[1])
             if b[0] not in SUPPORTED_TYPES:
                 raise ValueError('Unsupported type "%s". Supported types are %s' % (b[0], ', '.join(SUPPORTED_TYPES)))
             if b[1] != 'None':
@@ -98,21 +102,15 @@ class SaveFace:
             else:
                 self.args.pprintopts[b[0]] = None
 
-    def get_from_graph(self, O_Auth_tkn = None):
-        """
-            Gets the json string from facebook
-        Args:
-            O_Auth_tkn (None, optional): Description
-        
-        Raises:
-            ValueError: Raised if O_Auth_tkn is not set
-        """
+    def set_graph(self, O_Auth_tkn=None):
         if O_Auth_tkn is not None:
-            self.O_Auth_tkn = O_Auth_tkn
+            auth = O_Auth_tkn
+        else:
+            auth = self.args.O_Auth_tkn
 
-        if self.O_Auth_tkn is not None:
+        if auth is not None:
             try:
-                graph = GraphAPI(O_Auth_tkn)
+                graph = GraphAPI(auth)
             except fpexceptions.OAuthError as e:
                 print(type(e))
                 print(e.args)
@@ -120,6 +118,22 @@ class SaveFace:
         else:
             raise ValueError("O_Auth_tkn must be present")
 
+        self._graph = graph
+        return graph
+
+    def get_from_graph(self, graph=None, verbose=True):
+        """
+            Gets and returns the json string from facebook
+        
+        Raises:
+            ValueError: Raised if graph is not set is not set
+        """
+        if graph is None:
+            if self._graph is None:
+                raise ValueError("Either pass graph or self._graph must not be none.\n\
+                    Try (SaveFace)inst.set_graph()")
+            else:
+                graph = self._graph
         try:
             myjson = graph.get(self.args.request)['posts']
             sys.stdout.write("getting posts from %s\n" % (myjson['data'][-1]['created_time']))
@@ -136,23 +150,34 @@ class SaveFace:
                 print(e.args)
                 print(e)
 
-        print("received %s pages" % (self._num_pages))
-        self.fbjson = myjson
+        if verbose:
+            print("received %s pages" % (self._num_pages))
 
-    def __write_(self):
+        self.fbjson = myjson
+        return myjson
+
+    def __write_(self, results):
         """
             writes data to file
         """
-        if self.args.output_type is not "stdout":
-            with open(self.args.output_type, "w") as f:
-                f.write(self.results)
+        if self.args.output is not "stdout":
+            with open(self.args.output, "w") as f:
+                f.write(results)
 
-    def get_images(self):
+    def get_images(self, json=None, xmlstr=""):
         """
             gets the image urls from the received data
             and calls private function download
         """
-        xmlstring = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
+        if xmlstr != "":
+            xmlstring = xmlstr
+        elif json != {}:
+            xmlstring = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
+        elif self.fbjson != {}:
+            xmlstring = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
+        else:
+            raise ValueError("Either pass json or xml or SaveFace.fbjson must be populated with data")
+
         self._root = ET.fromstring(xmlstring)
         elements = []
         els = self._root.findall('image')
@@ -162,24 +187,18 @@ class SaveFace:
         elements = elements + els
         self.__download_(elements)
 
-    @BoundInnerClass #http://code.activestate.com/recipes/577070-bound-inner-classes/
+    @BoundInnerClass 
     class DownloadThread(threading.Thread):
-
         """
-            A bound inner thread class        
+            A bound inner thread class
+            http://code.activestate.com/recipes/577070-bound-inner-classes/
         """
-        
-        def __init__(self, queue):
-            """
-                initialise variables            
-            Args:
-                outer (object): the outer class instance
-                queue (Queue): thread queue
-            """
-            super(outer.DownloadThread, self).__init__()
+        def __init__(self, outer, queue):
+            print(outer)
+            super(outer.DownloadThread, self).__init__(self, outer)
             self._queue = queue
             self._destfolder = outer.args.imgfolder
-            self._daemon = True
+            self.daemon = True
             self._outer = outer
 
         def run(self):
@@ -294,9 +313,9 @@ if __name__ == "__main__":
         default='json', help='Optional. Can be one of json, pjson (prettyprinted) or xml. Defaults to json', 
         choices=['json', 'pjson', 'xml'], 
         dest='format')
-    parser.add_argument('-o --output_type', metavar='how to output the results', type=str, required=False, nargs='?',
+    parser.add_argument('-o --output', metavar='how to output the results', type=str, required=False, nargs='?',
         default='stdout', help='Optional. Accepts a string filename. Defaults to stdout', 
-        dest='output_type')
+        dest='output')
     parser.add_argument('-i --images', metavar='download images?',  type=bool, required=False, nargs='?',
         default=False, help='Optional.  A boolean to indicate whether or not to download images. Defaults to false', 
         dest='images')
