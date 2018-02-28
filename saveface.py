@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 """Summary
 """
-from Queue import Queue
+from multiprocessing import JoinableQueue
 import argparse
 import os
 import pprint
@@ -27,7 +27,6 @@ class SaveFace:
         filename (string): filename to store data in 
         O_Auth_tkn (TYPE): Description
     """
-    
     def __init__(self):
         """
             initialise class variables
@@ -41,6 +40,7 @@ class SaveFace:
         self._depth = None
         self._width = 80
         self._graph = None
+        self._img_folder = 'images'
 
         self.fbjson = {}
         self.args = {}
@@ -56,7 +56,7 @@ class SaveFace:
             ValueError: if O_Auth_tkn is not set
         """
         self.args = args
-
+        self._img_folder = self.args.img_folder
         self.set_graph(args.O_Auth_tkn)
         result = self.get_from_graph()
 
@@ -193,13 +193,12 @@ class SaveFace:
             A bound inner thread class
             http://code.activestate.com/recipes/577070-bound-inner-classes/
         """
-        def __init__(self, outer, queue):
-            print(outer)
-            super(outer.DownloadThread, self).__init__(self, outer)
+        def __init__(self, queue, img_folder):
+            #print(outer)
+            super(SaveFace.DownloadThread, self).__init__()
             self._queue = queue
-            self._destfolder = outer.args.imgfolder
+            self._destfolder = img_folder
             self.daemon = True
-            self._outer = outer
 
         def run(self):
             """
@@ -207,6 +206,7 @@ class SaveFace:
             """
             while True:
                 el = self._queue.get()
+                print('hello :' + el)
                 try:
                     self.__download_img_(el)
                 except Exception as e:
@@ -223,7 +223,7 @@ class SaveFace:
                 outer (object): Outer class instance
                 el (ElementTree<node>): element   TODO - check type
             """
-            print "[%s] Downloading %s -> %s" % (self.ident, el.nodeValue, self._destfolder)
+            print("[%s] Downloading %s -> %s" % (self.ident, el.nodeValue, self._destfolder))
             try:
                 img = urllib.FancyURLopener(el.nextSibling.nodeValue, self._destfolder)
             #get file tyoe
@@ -258,14 +258,14 @@ class SaveFace:
             elements (list): a list of elements
             numthreads (int, optional): number of threads
         """
-        queue = Queue()
+        queue = JoinableQueue()
         for el in elements:
             queue.put(el)
 
         self._images_total = len(elements)
 
         for i in range(numthreads):
-            t = self.DownloadThread(queue)
+            t = SaveFace.DownloadThread(queue, self._img_folder)
             t.start()
 
         queue.join()
@@ -320,8 +320,8 @@ if __name__ == "__main__":
         default=False, help='Optional.  A boolean to indicate whether or not to download images. Defaults to false', 
         dest='images')
     parser.add_argument('-d --image_path', metavar='path to images', type=str, required=False, nargs='?',
-        default='images', help='Optional. The path to the images folder. Defaults to images', 
-        dest='imgfolder')
+        default='images', help='Optional. The path to the images folder. Defaults to ./images', 
+        dest='img_folder')
     parser.add_argument('-p --pprint_options', metavar='pprint options', type=str, required=False, nargs='*',
         default='indent=4, width=80, depth=None, compact=False', help="Optional. Options string for pprint module.\n\
         Parameters must be named key=value with no comma ie indent=4 depth=80.",
