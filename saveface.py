@@ -2,35 +2,34 @@
 # -*- coding: UTF-8 -*-
 """Summary
 """
-from multiprocessing import JoinableQueue
+from abc import ABC
+from queue import Queue
 import argparse
 import os
 import pprint
 import sys
 import threading
 import urllib
-
+import json
 from facepy import GraphAPI
 from facepy import exceptions as fpexceptions
-import requests
+import json
 import dicttoxml
 from xml.etree import ElementTree as ET
 
 from boundinnerclasses import BoundInnerClass
 
-class SaveFace:
 
-    """
-    Attributes:
-        args (dict): args that get passed in from argparser
-        fbjson (dict): dict representation of json string
-        filename (string): filename to store data in 
-        O_Auth_tkn (TYPE): Description
-    """
+##an abstract base class for the passing of the class hierarchy
+##in a memory efficient and polymorphic manner.
+##I lost memory by including the bound innerclass 'Download thread'
+##which I am doing temporarily to examine the access ramifications
+##and the ease of using the bound inner class library 
+##the class hierarchy then extends from the ABC to a concrete base class
+##that saves pages as an array
+##which then is extended into utility types, that save as xml, or json etc
+class SaveFaceABC(ABC):
     def __init__(self):
-        """
-            initialise class variables
-        """
         self._num_pages = 0
         self._num_images = 0
         self._images_total = 0
@@ -42,167 +41,51 @@ class SaveFace:
         self._graph = None
         self._img_folder = 'images'
 
-        self.fbjson = {}
-        self.args = {}
-        self.O_Auth_tkn = None
-
-    def process_args(self, args):
+    def __download_(self, elements, numthreads=4):
         """
-            Internal function used by script when standalone
+        start threads downloading
+        
         Args:
-            args (dict): args from argparser
-        
-        Raises:
-            ValueError: if O_Auth_tkn is not set
+            elements (list): a list of elements
+            numthreads (int, optional): number of threads
         """
-        self.args = args
-        self._img_folder = self.args.img_folder
-        self.set_graph(args.O_Auth_tkn)
-        result = self.get_from_graph()
+        queue = Queue()
+        for el in elements:
+            queue.put(el)
 
-        if self.args.format == 'xml':
-            result = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
-        elif self.args.format == 'pjson':
-            self.__prepare_pprint_()
-            result = pprint.pformat(self.fbjson, indent=self.args.pprintopts['indent'], 
-                depth=self.args.pprintopts['depth'], width=self.args.pprintopts['width']) #compact is not yet instantiated compact=self._compact)
-        else:
-            result = self.fbjson
+        self._images_total = len(elements)
 
-        if self.args.output == 'stdout':
-            print(result)
-        else:
-            self.filename = self.args.output
-            self.__write_(result)
+        for i in range(numthreads):
+            t = SaveFace.__DownloadThread_(queue, self._img_folder)
+            t.start()
 
-        #images
-        if self.args.images == True:
-            self.get_images()
-            #exchange the text in the url nodes from the node list
-            #with local filepaths
-            #TODO
-
-            #self._root
-
-    def __prepare_pprint_(self):
-        """
-            prepares the pprint options string
-        """
-        SUPPORTED_TYPES = ['indent','width','depth']
-        self.args.pprintopts = {}
-        for a in args.pprint_opts:
-            b = a.split('=')
-            if b[0] not in SUPPORTED_TYPES:
-                raise ValueError('Unsupported type "%s". Supported types are %s' % (b[0], ', '.join(SUPPORTED_TYPES)))
-            if b[1] != 'None':
-                if b[1] == 'bool':
-                    self.args.pprintopts[b[0]] = bool(b[1])
-                else:
-                    self.args.pprintopts[b[0]] = int(b[1])
-            else:
-                self.args.pprintopts[b[0]] = None
-
-    def set_graph(self, O_Auth_tkn=None):
-        if O_Auth_tkn is not None:
-            auth = O_Auth_tkn
-        else:
-            auth = self.args.O_Auth_tkn
-
-        if auth is not None:
-            try:
-                graph = GraphAPI(auth)
-            except fpexceptions.OAuthError as e:
-                print(type(e))
-                print(e.args)
-                print(e)
-        else:
-            raise ValueError("O_Auth_tkn must be present")
-
-        self._graph = graph
-        return graph
-
-    def get_from_graph(self, graph=None, verbose=True):
-        """
-            Gets and returns the json string from facebook
-        
-        Raises:
-            ValueError: Raised if graph is not set is not set
-        """
-        if graph is None:
-            if self._graph is None:
-                raise ValueError("Either pass graph or self._graph must not be none.\n\
-                    Try (SaveFace)inst.set_graph()")
-            else:
-                graph = self._graph
-        try:
-            myjson = graph.get(self.args.request)['posts']
-            sys.stdout.write("getting posts from %s\n" % (myjson['data'][-1]['created_time']))
-            while(True):
-                posts = requests.get(myjson.pop('paging')['next']).json()
-                self._num_pages = self._num_pages + 1
-                if len(posts['data']):
-                    sys.stdout.write("getting posts from %s\n" % (posts['data'][-1]['created_time']))
-                    myjson = dict(myjson, **posts)
-                else:
-                    break
-        except (fpexceptions.OAuthError, KeyError) as e:
-                print(type(e))
-                print(e.args)
-                print(e)
-
-        if verbose:
-            print("received %s pages" % (self._num_pages))
-
-        self.fbjson = myjson
-        return myjson
-
-    def __write_(self, results):
-        """
-            writes data to file
-        """
-        if self.args.output is not "stdout":
-            with open(self.args.output, "w") as f:
-                f.write(results)
-
-    def get_images(self, json=None, xmlstr=""):
-        """
-            gets the image urls from the received data
-            and calls private function download
-        """
-        if xmlstr != "":
-            xmlstring = xmlstr
-        elif json != {}:
-            xmlstring = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
-        elif self.fbjson != {}:
-            xmlstring = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
-        else:
-            raise ValueError("Either pass json or xml or SaveFace.fbjson must be populated with data")
-
-        self._root = ET.fromstring(xmlstring)
-        elements = []
-        els = self._root.findall('image')
-        for el in els:
-            elements.push(el.find('src')[0])
-        els = self._root.findall('full_picture')
-        elements = elements + els
-        self.__download_(elements)
+        queue.join()    
 
     @BoundInnerClass 
-    class DownloadThread(threading.Thread):
+    class __DownloadThread_(threading.Thread):
         """
-            A bound inner thread class
-            http://code.activestate.com/recipes/577070-bound-inner-classes/
+        A bound inner thread class
+        http://code.activestate.com/recipes/577070-bound-inner-classes/
+        
+        Attributes:
+            daemon (bool): Description
         """
         def __init__(self, queue, img_folder):
+            """Summary
+            
+            Args:
+                queue (TYPE): Description
+                img_folder (TYPE): Description
+            """
             #print(outer)
-            super(SaveFace.DownloadThread, self).__init__()
+            super(SaveFace.__DownloadThread_, self).__init__()
             self._queue = queue
             self._destfolder = img_folder
             self.daemon = True
 
         def run(self):
             """
-                runs the threads
+            runs the threads
             """
             while True:
                 el = self._queue.get()
@@ -217,8 +100,9 @@ class SaveFace:
 
         def __download_img_(self, outer, el):
             """
-                downloads images, makes filenames, prints download progress
-                makes filename  mostly semi-psuedocode currently
+            downloads images, makes filenames, prints download progress
+            makes filename  mostly semi-psuedocode currently
+            
             Args:
                 outer (object): Outer class instance
                 el (ElementTree<node>): element   TODO - check type
@@ -251,36 +135,301 @@ class SaveFace:
                 print(e.args)
                 print(e)    
 
-    def __download_(self, elements, numthreads=4):
+class SaveFace(SaveFaceABC):
+    """
+    A class to download information using the facebook graph api
+    and save them in a variety of formats.  My first python, more or less,
+    to teach myself some of the language features
+
+    Attributes:
+        args (dict): args that get passed in from argparser
+        fbjson (dict): dict representation of json string
+        filename (string): filename to store data in 
+        O_Auth_tkn (TYPE): Description
+    """
+    def __init__(self):
         """
-            start threads downloading
+        initialise class variables
+        """
+        super.__init__()
+        
+        self.write_pages = False  #write pages as they are received
+        self.pages = [] #the result dictionary
+        self.args = {} #the args from command line input
+        self.O_Auth_tkn = None # the auth token
+
+    #graph functions
+    def init_graph(self, O_Auth_tkn=None):
+        """
+            set the internal graph object
+        
         Args:
-            elements (list): a list of elements
-            numthreads (int, optional): number of threads
+            O_Auth_tkn (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        
+        Raises:
+            ValueError: Description
         """
-        queue = JoinableQueue()
-        for el in elements:
-            queue.put(el)
+        if O_Auth_tkn is not None:
+            auth = O_Auth_tkn
+        else:
+            auth = self.args.O_Auth_tkn
 
-        self._images_total = len(elements)
+        if auth is not None:
+            try:
+                graph = GraphAPI(auth)
+            except (fpexceptions.OAuthError, fpexceptions.HTTPError) as e:
+                print(type(e))
+                print(e.args)
+                print(e)
+        else:
+            raise ValueError("O_Auth_tkn must be present")
 
-        for i in range(numthreads):
-            t = SaveFace.DownloadThread(queue, self._img_folder)
-            t.start()
+        self._graph = graph
+        return graph
 
-        queue.join()
+    def get_page_from_graph(self, request_string=None, graph=None, verbose=True):
+        """
+            Gets a page from the facebook graph
+        
+        Args:
+            request_string (string, optional): a request string for facebook graph api
+            graph (string, optional): facepy graph object from inst.init_graph        
+        Returns:
+            dict: a dictionary containing the results from facebook
+        
+        Raises:
+            fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError: 
+               facepy request errors
+        """
+        if graph is None:
+            if self._graph is None:
+                raise ValueError("graph must be initialised")
+            else:
+                graph = self._graph
 
-# Print iterations progress
+        if request_string is None:
+            if self.args.request_string is not None:
+                request_string = self.args.request_string
+
+        try:
+            return graph.get(request_string)
+        except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
+            print(type(e))
+            print(e.args)
+            print(e) 
+
+    def get_pages_from_graph(self, graph=None, number_of_pages=None, request_string=None, verbose=True):
+        """
+        Gets and returns the json string from facebook
+        
+        Raises:
+            ValueError: Raised if graph is not set is not set
+        
+        Args:
+            graph (None, optional): Description
+            verbose (bool, optional): Description
+        
+        Returns:
+            array: array of dicts that are pages
+        """
+        if graph is None:
+            if self._graph is None:
+                raise ValueError("graph must be initialised")
+            else:
+                graph = self._graph
+        try:
+            num_pages = 0
+            posts = {}
+            pages = []
+            while(True):
+                sys.stdout.write("getting page number %d\n" % (self._num_pages + 1))
+                num_pages = num_pages + 1
+                print("hey there : " + str(len(posts.items())))
+                if num_pages == number_of_pages:
+                    request_string == posts.pop(['paging']['next'])
+                    pages.push(self.get_page_from_graph(request_string))
+                    if self.write_pages:
+                        self.write(posts, "output_page%s" % (num_pages))
+                else:
+                    break
+        except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError, KeyError) as e:
+                print(type(e))
+                print(e.args)
+                print(e)
+
+        if verbose:
+            print("received %s pages" % (num_pages))
+        self._num_pages = num_pages
+        self.pages = pages
+        return pages
+
+class SaveFaceXML():
+
+    def __init__():
+        super.__init__()
+
+    def get_images(self, results):
+        """
+        gets the image urls from the received data
+        and calls private function download
+        
+        Args:
+            results(dict : required): dict results returned from facebook api
+        
+        Raises:
+            ValueError: Description
+        """
+        if results is not dict:
+            raise TypeError("parameter of get_images must be a dictionary")
+
+        if results != {}:
+            xmlstring = dicttoxml.dicttoxml(results, attr_type=False)
+
+        self._root = ET.fromstring(xmlstring)
+    #test
+        for it in self._root.iterfind('image'):
+            print(it)
+
+        elements = []
+        els = self._root.findall('image')
+        for el in els:
+            elements.push(el.find('src')[0])
+        els = self._root.findall('full_picture')
+        elements = elements + els
+        print ('hey' + str(len(elements)))
+        self.__download_(elements)
+
+    def embed_file_paths():
+        pass  #TODO
+
+    #output
+    def write(self, results, filename, filepath, type='raw', asBytes=True):
+        """
+            Writes data to file as str. type is passed as
+            either 'json','xml','raw'. The data is written as a
+            bytes.
+        
+        Args:
+            results (str): string to write 
+            type (str): Either 'json' or 'xml'
+        """
+        SUPPORTED_TYPES = ['xml','json','raw'] #'pprint'
+        if type not in SUPPORTED_TYPES:
+            raise ValueError('Unsupported type "%s". Supported types are %s' % (type, ', '.join(SUPPORTED_TYPES)))
+        if type == 'xml':
+            s = dicttoxml.dicttoxml(results, attr_type=False) 
+        elif type == 'json':
+            s = json.dumps(results).emcpde()
+        elif type is 'raw':
+            s = str(results).encode()
+
+        if asBytes:
+            with open(filename, "wb") as f:
+                f.write(s)
+        else:
+            with open(filename, "w") as f:
+                f.write(s.decode())
+
+    def prprint(self, fbjson=None, _indent=None, _width=None, _depth=None):
+        """prettyprints the results string
+        
+        Args:
+            fbjson (json, optional): json string returned from graph.get
+        
+        Returns:
+            TYPE: Description
+        """
+        if _indent == None:
+            if self.args.pprintopts['indent'] is not None:
+                _indent = self.args.pprintopts['indent']
+            else:
+                _indent = 4
+        if _width == None:
+            if self.args.pprintopts['width'] is not None:
+                _width = self.args.pprintopts['width']
+            else:
+                _width = 80
+        if _depth == None:
+            if self.args.pprintopts['depth'] is not None:
+                _depth = self.args.pprintopts['depth']
+        if fbjson == None:
+            fbjson == self._fbjson
+
+        return pprint.pformat(fbjson, indent=_indent, width=_width, depth=_depth)
+
+    def process_args(self, args):
+        """
+        Internal function used by script when standalone
+        
+        Args:
+            args (dict): args from argparser
+        
+        No Longer Raises:
+            ValueError: if O_Auth_tkn is not set
+        """
+        self.args = args
+        self._img_folder = self.args.img_folder
+        self.init_graph(args.O_Auth_tkn)
+        self.fbjson = self.get_from_graph()
+
+        if self.args.format == 'xml':
+            result = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
+        elif self.args.format == 'pjson':
+            self.__prepare_pprint_()
+            result = self.prprint() #compact is not yet instantiated compact=self._compact)
+        else:
+            result = self.pages
+
+        if self.args.output == 'stdout':
+            print(result)
+        else:
+            self.write(result, self.args.output, 'raw')
+
+        #images
+        if self.args.images == True:
+            self.get_images(result)
+            #exchange the text in the url nodes from the node list
+            #with local filepaths
+            #TODO
+
+            #self._root
+
+    def __prepare_pprint_(self):
+        """
+        prepares the pprint options string from the args
+        
+        Raises:
+            ValueError: Description
+        """
+        SUPPORTED_TYPES = ['indent','width','depth']
+        self.args.pprintopts = {}
+        for a in args.pprint_opts:
+            b = a.split('=')
+            if b[0] not in SUPPORTED_TYPES:
+                raise ValueError('Unsupported type "%s". Supported types are %s' % (b[0], ', '.join(SUPPORTED_TYPES)))
+            if b[1] != 'None':
+                if b[1] == 'bool':
+                    self.args.pprintopts[b[0]] = bool(b[1])
+                else:
+                    self.args.pprintopts[b[0]] = int(b[1])
+            else:
+                self.args.pprintopts[b[0]] = None     
+
 def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
     """
     Call in a loop to create terminal progress bar
-    @params:
+    https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
+    Args:
         iteration   - Required  : current iteration (Int)
         total       - Required  : total iterations (Int)
         prefix      - Optional  : prefix string (Str)
         suffix      - Optional  : suffix string (Str)
         decimals    - Optional  : positive number of decimals in percent complete (Int)
         bar_length  - Optional  : character length of bar (Int)
+    
     """
     str_format = "{0:." + str(decimals) + "f}"
     percents = str_format.format(100 * (iteration / float(total)))
@@ -294,6 +443,7 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
     sys.stdout.flush()
 
 if __name__ == "__main__":
+    #me?fields=id,name,posts.include_hidden(true){created_time,from,message,comments{created_time,from,message,comments{created_time,from,message},attachment},full_picture}
     defaultqstring = "me?fields=id,name,posts.include_hidden(true)\
                      {created_time,from,message,comments\
                      {created_time,from,message,comments\
