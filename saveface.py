@@ -50,6 +50,7 @@ from xml.etree import ElementTree as ET
 ##can achieve polymorphism if the extended class has methods that are not
 ##in the base class.  Need to read.
 class SaveFaceABC(ABC):
+    @abstractmethod
     def __init__(self):
         super().__init__()
 
@@ -85,7 +86,7 @@ class SaveFace(SaveFaceABC):
         """
         initialise class variables
         """
-        super.__init__(self)
+        super().__init__()
         self._num_pages = 0
         self._num_images = 0
         self._images_total = 0
@@ -139,7 +140,6 @@ class SaveFace(SaveFaceABC):
                 queue (TYPE): Description
                 img_folder (TYPE): Description
             """
-            #print(outer)
             super(SaveFace.__DownloadThread_, self).__init__()
             self._queue = queue
             self._destfolder = img_folder
@@ -191,7 +191,7 @@ class SaveFace(SaveFaceABC):
                 img.close()
             #increment counter for name and print progress
                 outer._num_images += 1
-                print_progress(outer._num_images, outer._images_total)
+                outer.print_progress(outer._num_images, outer._images_total)
             except (urllib.ContentTooShortError, IOError) as e:
                 print(type(e))
                 print(e.args)
@@ -211,7 +211,7 @@ class SaveFace(SaveFaceABC):
         Raises:
             ValueError: Description
         """
-        super.init_graph(self, O_Auth_tkn)
+        super().init_graph(O_Auth_tkn)
 
         if O_Auth_tkn is not None:
             auth = O_Auth_tkn
@@ -245,7 +245,7 @@ class SaveFace(SaveFaceABC):
             fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError: 
                facepy request errors
         """
-        super.get_page_from_graph(self, request_string, graph, verbose)
+        super().get_page_from_graph(request_string, graph, verbose)
 
         if graph is None:
             if self._graph is None:
@@ -254,15 +254,12 @@ class SaveFace(SaveFaceABC):
                 graph = self._graph
 
         if request_string is None:
-            if self.args.request_string is not None:
-                request_string = self.args.request_string
+            raise ValueError("request_string must be defined")
 
         try:
             return graph.get(request_string)
         except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
-            print(type(e))
-            print(e.args)
-            print(e)
+            raise e
 
     def get_pages_from_graph(self, graph=None, number_of_pages=None, request_string=None, verbose=True):
         """
@@ -278,32 +275,31 @@ class SaveFace(SaveFaceABC):
         Returns:
             array: array of dicts that are pages
         """
-        super.get_pages_from_graph(self, graph, number_of_pages, request_string, verbose)
+        super().get_pages_from_graph(graph, number_of_pages, request_string, verbose)
 
-        if graph is None:
-            if self._graph is None:
-                raise ValueError("graph must be initialised")
-            else:
-                graph = self._graph
-        try:
-            num_pages = 0
-            posts = {}
-            pages = []
-            while(True):
-                sys.stdout.write("getting page number %d\n" % (self._num_pages + 1))
-                num_pages = num_pages + 1
-                print("hey there : " + str(len(posts.items())))
-                if num_pages < number_of_pages:
-                    pages.push(self.get_page_from_graph(request_string))
-                    request_string == posts.pop(['paging']['next'])
-                    if self.write_pages:
-                        self.write(posts, "output_page%s" % (num_pages))
-                else:
-                    break
-        except(fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError, KeyError) as e:
+        num_pages = 0
+        pages = []
+        while(True):
+            sys.stdout.write("getting page number %d\n" % (self._num_pages + 1))
+            num_pages = num_pages + 1
+            try:
+                pages.append(self.get_page_from_graph(request_string))
+            except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
                 print(type(e))
                 print(e.args)
                 print(e)
+                break                
+            else:
+                if pages[-1] is not None:
+                    if 'paging' in pages[-1]:
+                        request_string == pages[-1].pop(['paging'])['next']
+                    else:
+                        break
+                if self.write_pages:
+                    self.write(pages[-1], "output_page%s" % (num_pages))
+                if number_of_pages is not None:
+                    if num_pages >= number_of_pages:
+                        break
 
         if verbose:
             print("received %s pages" % (num_pages))
@@ -325,19 +321,48 @@ class SaveFace(SaveFaceABC):
         else:
             return file
 
-
     def write(self, filename, filepath, overwrite=True):
-        super.write(self, filename, filepath, overwrite)
+        super().write(self, filename, filepath, overwrite)
         self.init_path(filename, filepath, overwrite)
+
+    def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
+        """
+        Call in a loop to create terminal progress bar
+        https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
+        Args:
+            iteration   - Required  : current iteration (Int)
+            total       - Required  : total iterations (Int)
+            prefix      - Optional  : prefix string (Str)
+            suffix      - Optional  : suffix string (Str)
+            decimals    - Optional  : positive number of decimals in percent complete (Int)
+            bar_length  - Optional  : character length of bar (Int)
+        
+        """
+        str_format = "{0:." + str(decimals) + "f}"
+        percents = str_format.format(100 * (iteration / float(total)))
+        filled_length = int(round(bar_length * iteration / float(total)))
+        bar = '█' * filled_length + '-' * (bar_length - filled_length)
+
+        sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix))
+
+        if iteration == total:
+            sys.stdout.write('\n')
+        sys.stdout.flush()
+
+    def __str__(self):
+        string = ""
+        for page in self.pages:
+            string = string + page
+        return string
 
 class SaveFaceXML(SaveFace):
 
     def __init__(self):
-        super.__init__(self)
+        super().__init__(self)
         self.root = ET.fromstring('<root></root>')
 
     def get_pages_from_graph(self, graph=None, number_of_pages=None, request_string=None, verbose=True):
-        super.get_pages_from_graph(self, graph, number_of_pages, request_string, verbose)
+        super().get_pages_from_graph(self, graph, number_of_pages, request_string, verbose)
         if len(self.pages):
             for page in self.pages:
                 self.root.append(ET.XML(dicttoxml.dicttoxml(page)))
@@ -350,10 +375,10 @@ class SaveFaceXML(SaveFace):
             results (str): string to write 
             type (str): Either 'json' or 'xml'
         """
-        super.write(self, filename, filepath, overwrite)
+        super().write(self, filename, filepath, overwrite)
         try:
             with open(filename, 'w') as output:
-                self.root.write(output, encoding="utf8")
+                self.root.write(output, encoding="unicode", method="xml")
         except IOError as e:
             print(type(e))
             print(e.args)
@@ -392,11 +417,14 @@ class SaveFaceXML(SaveFace):
 
     def embed_file_paths():
         pass  #TODO
+
+    def __str__(self):
+        return ET.tostring(self.root, encoding="unicode", method="xml")
  
 class SaveFaceHTML(SaveFaceXML):
     
     def __init__(self):
-        super.__init__(self)
+        super().__init__()
 
     #todo - add xml_declaration
     def write(self, filename, filepath, overwrite=True):
@@ -404,27 +432,34 @@ class SaveFaceHTML(SaveFaceXML):
             Writes data to file as xml
         
         Args:
-            results (str): string to write 
-            type (str): Either 'json' or 'xml'
+            filename (str): name of file
+            filepath (str): path to file
+            overwrite(bool): whether to overwrite file 
         """
-        super.write(self, filename, filepath, overwrite)
+        super().write(self, filename, filepath, overwrite)
         try:
             with open(filename, 'w') as output:
-                self.root.write(output, encoding="utf8", method='html')
+                self.root.write(output, encoding="unicode", method='html')
         except IOError as e:
             print(type(e))
             print(e.args)
             print(e)
 
+    def __str__(self):
+        return ET.tostring(self.root, encoding="unicode", method="html")
 
 class SaveFaceJSON(SaveFace):
 
-    def __init__(self):
-        super.__init__(self)
+    def __init__(self, ispretty=False, indent=4, width=80, depth=None):
+        super().__init__()
         self.json = {}
+        self._indent=indent
+        self._width=width
+        self._depth=None
+        self._ispretty=ispretty
 
     def get_pages_from_graph(self, graph=None, number_of_pages=None, request_string=None, verbose=True):
-        super.get_pages_from_graph(self, graph, number_of_pages, request_string, verbose)
+        super().get_pages_from_graph(graph, number_of_pages, request_string, verbose)
         page_string = ''
         if len(self.pages):
             for page in self.pages:
@@ -432,124 +467,111 @@ class SaveFaceJSON(SaveFace):
         self.json = json.loads(json.dumps(page_string)) #I think
 
     def write(self, filename, filepath, overwrite=True):
-        super.write(self, filename, filepath, overwrite)
+        super().write(self, filename, filepath, overwrite)
         try:
             with open(filename, 'w') as output:
-                json.dump(self.json, output)
+                if self._ispretty:
+                    json.dump(pprint(indent=self._indent, width=self._width, depth=self._depth), output)
+                else:
+                    json.dump(self.json, output)
         except IOError as e:
             print(type(e))
             print(e.args)
             print(e)
 
-    #todo
-    def prprint(self, fbjson=None, _indent=None, _width=None, _depth=None):
+    def prprint(self, indent=None, width=None, depth=None):
         """prettyprints the results string
         
         Args:
-            fbjson (json, optional): json string returned from graph.get
+            indent: int
+            width: int
+            depth: int    values for pprint
         
         Returns:
-            TYPE: Description
+            str: pretty printed string representation
         """
-        if _indent == None:
-            if self.args.pprintopts['indent'] is not None:
-                _indent = self.args.pprintopts['indent']
-            else:
-                _indent = 4
-        if _width == None:
-            if self.args.pprintopts['width'] is not None:
-                _width = self.args.pprintopts['width']
-            else:
-                _width = 80
-        if _depth == None:
-            if self.args.pprintopts['depth'] is not None:
-                _depth = self.args.pprintopts['depth']
-        if fbjson == None:
-            fbjson == self._fbjson
+        if indent is not None:
+            indent = self._indent
+        if width is not None:
+            width = self._width
+        if depth is not None:
+            depth = self._depth
 
-        return pprint.pformat(fbjson, indent=_indent, width=_width, depth=_depth)
-
-    def process_args(self, args):
-        """
-        Internal function used by script when standalone
-        
-        Args:
-            args (dict): args from argparser
-        
-        No Longer Raises:
-            ValueError: if O_Auth_tkn is not set
-        """
-        self.args = args
-        self._img_folder = self.args.img_folder
-        self.init_graph(args.O_Auth_tkn)
-        self.fbjson = self.get_from_graph()
-
-        if self.args.format == 'xml':
-            result = dicttoxml.dicttoxml(self.fbjson, attr_type=False)
-        elif self.args.format == 'pjson':
-            self.__prepare_pprint_()
-            result = self.prprint() #compact is not yet instantiated compact=self._compact)
+        if self.json == None:
+            raise ValueError("Json object can not be none.  Get Page/s first")
         else:
-            result = self.pages
+            return pprint.pformat(self.json, indent=indent | self._indent, width=self._width, depth=self._depth)
 
-        if self.args.output == 'stdout':
-            print(result)
+    def __str__(self):
+        if self._ispretty:
+            return pprint()
         else:
-            self.write(result, self.args.output, 'raw')
+            return json.dumps(self.json)
 
-        #images
-        if self.args.images == True:
-            self.get_images(result)
-            #exchange the text in the url nodes from the node list
-            #with local filepaths
-            #TODO
-
-            #self._root
-
-    def __prepare_pprint_(self):
-        """
-        prepares the pprint options string from the args
-        
-        Raises:
-            ValueError: Description
-        """
-        SUPPORTED_TYPES = ['indent','width','depth']
-        self.args.pprintopts = {}
-        for a in args.pprint_opts:
-            b = a.split('=')
-            if b[0] not in SUPPORTED_TYPES:
-                raise ValueError('Unsupported type "%s". Supported types are %s' % (b[0], ', '.join(SUPPORTED_TYPES)))
-            if b[1] != 'None':
-                if b[1] == 'bool':
-                    self.args.pprintopts[b[0]] = bool(b[1])
-                else:
-                    self.args.pprintopts[b[0]] = int(b[1])
-            else:
-                self.args.pprintopts[b[0]] = None     
-
-def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
+def process_args(args):
     """
-    Call in a loop to create terminal progress bar
-    https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
-    Args:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        bar_length  - Optional  : character length of bar (Int)
+    Internal function used by script when standalone
     
+    Args:
+        args (dict): args from argparser
+    
+    No Longer Raises:
+        ValueError: if O_Auth_tkn is not set
     """
-    str_format = "{0:." + str(decimals) + "f}"
-    percents = str_format.format(100 * (iteration / float(total)))
-    filled_length = int(round(bar_length * iteration / float(total)))
-    bar = '█' * filled_length + '-' * (bar_length - filled_length)
+    sf = None
+    if args.format == 'xml':
+        sf = SaveFaceXML()
+    elif args.format == 'json':
+        sf = SaveFaceJSON()
+    elif args.format == 'pjson':
+        __prepare_pprint_()
+        sf = SaveFaceJSON(ispretty=True,
+            indent=args.pprint_opts['indent'], 
+            width=args.pprint_opts['width'], 
+            depth=args.pprint_opts['depth'])
+    elif args.format == 'html':
+        sf = SaveFaceHTML()
 
-    sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix))
+    sf.init_graph(args.O_Auth_tkn)
+    sf.get_pages_from_graph(request_string=args.request_string)
 
-    if iteration == total:
-        sys.stdout.write('\n')
-    sys.stdout.flush()
+    if args.output == 'stdout':
+        print(str(sf))
+    else:
+        sf.write(args.output, './')
+
+    #images
+   # if self.args.images == True:
+        #self.sf.get_images(result)
+        #exchange the text in the url nodes from the node list
+        #with local filepaths
+        #TODO
+
+        #self._root
+
+def __prepare_pprint_(args):
+    """
+    prepares the pprint options string from the args
+    
+    Raises:
+        ValueError: Description
+    """
+    SUPPORTED_TYPES = ['indent','width','depth']
+    for a in args.pprint_opts:
+        b = a.split('=')
+        if b[0] not in SUPPORTED_TYPES:
+            raise ValueError('Unsupported type "%s". Supported types are %s' % (b[0], ', '.join(SUPPORTED_TYPES)))
+        if b[1] != 'None':
+            args.pprint_opts[b[0]] = int(b[1])
+        else:
+            args.pprint_opts[b[0]] = None  
+
+    if args.pprint_opts['indent'] is None:
+        args.pprint_opts['indent'] = 4
+    if args.pprint_opts['width'] is None:
+        args.pprint_opts['width'] = 80
+    if args.pprint_opts['depth'] is None:
+        args.pprint_opts['depth'] = 20           
 
 if __name__ == "__main__":
     #me?fields=id,name,posts.include_hidden(true){created_time,from,message,comments{created_time,from,message,comments{created_time,from,message},attachment},full_picture}
@@ -561,31 +583,29 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(epilog="Saving Face with saveface.py", description="Download facebook posts,comments,images etc.\n\
         Default request string is :\n" + defaultqstring)
     
-    parser.add_argument('-a --auth_tkn', metavar='facebook auth token', type=str, required=True, nargs='?', 
+    parser.add_argument('-a', '--auth_tkn', metavar='facebook auth token', type=str, required=True, nargs='?', 
         help='Required. Your app\'s facebook authorisation token', 
         dest='O_Auth_tkn')
-    parser.add_argument('-r --request_string', metavar='rest api request string', type=str, required=False, nargs='?',
+    parser.add_argument('-r', '--request_string', metavar='rest api request string', type=str, required=False, nargs='?',
         default=defaultqstring, 
         help='Optional. The request string to query facebook\'s api. Defaults to posts,comments,images',
-        dest='request')
-    parser.add_argument('-f --format', metavar='output format for results', type=str, required=False, nargs='?',
+        dest='request_string')
+    parser.add_argument('-f', '--format', metavar='output format for results', type=str, required=False, nargs='?',
         default='json', help='Optional. Can be one of json, pjson (prettyprinted) or xml. Defaults to json', 
-        choices=['json', 'pjson', 'xml'], 
+        choices=['json', 'pjson', 'xml', 'html'], 
         dest='format')
-    parser.add_argument('-o --output', metavar='how to output the results', type=str, required=False, nargs='?',
+    parser.add_argument('-o', '--output', metavar='how to output the results', type=str, required=False, nargs='?',
         default='stdout', help='Optional. Accepts a string filename. Defaults to stdout', 
         dest='output')
-    parser.add_argument('-i --images', metavar='download images?',  type=bool, required=False, nargs='?',
+    parser.add_argument('-i', '--images', metavar='download images?',  type=bool, required=False, nargs='?',
         default=False, help='Optional.  A boolean to indicate whether or not to download images. Defaults to false', 
         dest='images')
-    parser.add_argument('-d --image_path', metavar='path to images', type=str, required=False, nargs='?',
+    parser.add_argument('-d', '--image_path', metavar='path to images', type=str, required=False, nargs='?',
         default='images', help='Optional. The path to the images folder. Defaults to ./images', 
         dest='img_folder')
-    parser.add_argument('-p --pprint_options', metavar='pprint options', type=str, required=False, nargs='*',
-        default='indent=4, width=80, depth=None, compact=False', help="Optional. Options string for pprint module.\n\
+    parser.add_argument('-p', '--pprint_options', metavar='pprint options', type=str, required=False, nargs='*',
+        default='indent=4, width=80, depth=None', help="Optional. Options string for pprint module.\n\
         Parameters must be named key=value with no comma ie indent=4 depth=80.",
         dest='pprint_opts')
 
-    args = parser.parse_args()
-    SF = SaveFace()
-    SF.process_args(args)
+    process_args(parser.parse_args())
