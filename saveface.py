@@ -100,7 +100,7 @@ class SaveFace(SaveFaceABC):
 
         self.filename = ""
         self.filepath = ""
-        self.write_pages = False  #write pages as they are received
+        self.write_pages = True  #write pages as they are received
         self.pages = [] #the result dictionary
         self.args = {} #the args from command line input
 
@@ -261,9 +261,20 @@ class SaveFace(SaveFaceABC):
         except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
             raise e
 
+    def request_page_from_graph(self, request_string=None, verbose=True):
+        super().request_page_from_graph(request_string, graph, verbose)
+
+        if request_string is None:
+            raise ValueError("request_string must be defined")
+
+        try:
+            return requests.get(request_string)
+        except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
+            raise e
+
     def get_pages_from_graph(self, graph=None, number_of_pages=None, request_string=None, verbose=True):
         """
-        Gets and returns as set of dicts stored in an array from facebook
+        Populates a list of dicts representing pages of stored in an array from facebook
         
         Raises:
             ValueError: Raised if graph is not set is not set
@@ -277,30 +288,54 @@ class SaveFace(SaveFaceABC):
         """
         super().get_pages_from_graph(graph, number_of_pages, request_string, verbose)
 
+        if graph is None:
+            if self._graph is None:
+                raise ValueError("graph must be initialised")
+            else:
+                graph = self._graph
+
         num_pages = 0
         pages = []
-        while(True):
-            sys.stdout.write("getting page number %d\n" % (self._num_pages + 1))
-            num_pages = num_pages + 1
-            try:
-                pages.append(self.get_page_from_graph(request_string))
-            except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
-                print(type(e))
-                print(e.args)
-                print(e)
-                break                
-            else:
-                if pages[-1] is not None:
-                    if 'paging' in pages[-1]:
-                        request_string == pages[-1].pop(['paging'])['next']
-                    else:
-                        break
-                if self.write_pages:
-                    self.write(pages[-1], "output_page%s" % (num_pages))
-                if number_of_pages is not None:
-                    if num_pages >= number_of_pages:
-                        break
+        if verbose:
+            sys.stdout.write("getting page number %d\n" % (num_pages + 1))
+        num_pages = num_pages + 1
+        pages.append(self.get_page_from_graph(request_string))
+        try:
+            # for page in graph.get(request_string, page=True, options="since=2011-07-01"):
+            #     pages.append(page)
+            #     print(str(page))
+            pages.append(self.request_page_from_graph(request_string))
 
+
+            #### TODO #####
+            #I can either use requests library as above
+            #or I can extract the id from the returned 'next' string:
+            #https://graph.facebook.com/v2.5/710782929015815/posts?fields=created_time,f........
+            # ie regex to get 710782929015815 and make new string to request from graph
+            # ie graph api explorer request :
+            # 710782929015815/?fields=id,name,posts.since(2010).include_hidden(true){created_time,from,message,comments{created_time,from,message,comments{created_time,from,message},attachment},full_picture}
+            #it would be nice to make a custom iteratable of the posts
+        except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
+            print(type(e))
+            print(e.args)
+            print(e)
+    
+            if pages[-1] is not None:
+                if 'posts' in pages[-1]:
+                    request_string = pages[-1]['posts']['paging']['next']
+                    #del pages[-1]['posts']['paging']
+                elif 'paging' in pages[-1]:
+                    print("hi")
+                    request_string = pages[-1]['paging']['next']
+                    pages[-1]['paging']
+                else:
+                    break
+            if self.write_pages:
+                with open( "output_page%s" % (num_pages), 'w') as output:
+                    output.write(str(pages[-1]))
+            if number_of_pages is not None:
+                if num_pages >= number_of_pages:
+                    break
         if verbose:
             print("received %s pages" % (num_pages))
         self._num_pages = num_pages
@@ -322,7 +357,7 @@ class SaveFace(SaveFaceABC):
             return file
 
     def write(self, filename, filepath, overwrite=True):
-        super().write(self, filename, filepath, overwrite)
+        super().write(filename, filepath, overwrite)
         self.init_path(filename, filepath, overwrite)
 
     def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
@@ -536,7 +571,7 @@ def process_args(args):
     sf.get_pages_from_graph(request_string=args.request_string)
 
     if args.output == 'stdout':
-        print(str(sf))
+        print("hello")#str(sf))
     else:
         sf.write(args.output, './')
 
@@ -575,7 +610,7 @@ def __prepare_pprint_(args):
 
 if __name__ == "__main__":
     #me?fields=id,name,posts.include_hidden(true){created_time,from,message,comments{created_time,from,message,comments{created_time,from,message},attachment},full_picture}
-    defaultqstring = "me?fields=id,name,posts.include_hidden(true)\
+    defaultqstring = "me?fields=posts.include_hidden(true)\
                      {created_time,from,message,comments\
                      {created_time,from,message,comments\
                      {created_time,from,message},attachment},full_picture}"
