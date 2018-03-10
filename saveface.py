@@ -60,6 +60,10 @@ class SaveFaceABC(ABC):
         pass
 
     @abstractmethod
+    def request_page_from_graph(self, request_string=None, graph=None, verbose=True):
+        pass
+
+    @abstractmethod
     def get_page_from_graph(self, request_string=None, graph=None, verbose=True):
         pass
 
@@ -269,7 +273,7 @@ class SaveFace(SaveFaceABC):
             raise ValueError("request_string must be defined")
 
         try:
-            return requests.get(request_string)
+            return requests.get(request_string).json()
         except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
             raise e
 
@@ -297,29 +301,32 @@ class SaveFace(SaveFaceABC):
 
         num_pages = 0
         pages = []
-        
+        found = False
         pages.append(self.get_page_from_graph(request_string))
-        request_string = '/' + request_string[2:]
-        idnum = re.search('(?<=\/)\d+(?=\/)', pages[-1]['posts']['paging']['next'])
-        print(idnum)
+        #request_string = '/' + request_string[2:]
+        #idnum = re.search('(?<=\/)\d+(?=\/)', pages[-1]['posts']['paging']['next'])
+
         try:
             while(True):
-                if idnum is not None:
-                    print('hello')
-                    print(idnum.group(0) + request_string)
-                    pages.append(self.get_page_from_graph(idnum.group(0) + request_string))
-                    print(len(pages))
-                    break
+            #print(pages[-1])
+                for np in self.dict_extract('next', pages[-1]):
+                    found = True
+                    pages.append(self.request_page_from_graph(np))
                     num_pages = num_pages + 1
-                    if number_of_pages is not None and num_pages < number_of_pages:
-                        break
+                if found:
+                    found = False
+                else:
+                    break
+                if number_of_pages is not None and num_pages < number_of_pages:
+                    break
 
                 if verbose:
                     sys.stdout.write("getting page number %d\n" % len(pages))
+            #idnum = re.search('(?<=\/)\d+(?=\/)', pages[-1]['posts']['paging']['next'])
 
-                idnum = re.search('(?<=\/)\d+(?=\/)', pages[-1]['posts']['paging']['next'])
-               
-        except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
+
+
+        except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError, KeyError) as e:
             print(type(e))
             print(e.args)
             print(e)
@@ -343,6 +350,20 @@ class SaveFace(SaveFaceABC):
         self._num_pages = num_pages
         self.pages = pages
         return pages
+
+    #https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
+    def dict_extract(self, key, var):
+        if hasattr(var,'items'):
+            for k, v in var.items():
+                if k == key:
+                    yield v
+                if isinstance(v, dict):
+                    for result in self.dict_extract(key, v):
+                        yield result
+                elif isinstance(v, list):
+                    for d in v:
+                        for result in self.dict_extract(key, d):
+                            yield result
 
     def init_path(filepath, filename, overwrite):
         if not Path.exists(filepath):
