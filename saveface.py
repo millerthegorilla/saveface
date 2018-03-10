@@ -30,7 +30,8 @@ import os
 import pprint
 import sys
 import threading
-import urllib
+import requests
+import re
 
 from boundinnerclasses import BoundInnerClass
 import dicttoxml
@@ -262,7 +263,7 @@ class SaveFace(SaveFaceABC):
             raise e
 
     def request_page_from_graph(self, request_string=None, verbose=True):
-        super().request_page_from_graph(request_string, graph, verbose)
+        super().request_page_from_graph(request_string, verbose)
 
         if request_string is None:
             raise ValueError("request_string must be defined")
@@ -296,46 +297,47 @@ class SaveFace(SaveFaceABC):
 
         num_pages = 0
         pages = []
-        if verbose:
-            sys.stdout.write("getting page number %d\n" % (num_pages + 1))
-        num_pages = num_pages + 1
+        
         pages.append(self.get_page_from_graph(request_string))
+        request_string = '/' + request_string[2:]
+        idnum = re.search('(?<=\/)\d+(?=\/)', pages[-1]['posts']['paging']['next'])
+        print(idnum)
         try:
-            # for page in graph.get(request_string, page=True, options="since=2011-07-01"):
-            #     pages.append(page)
-            #     print(str(page))
-            pages.append(self.request_page_from_graph(request_string))
+            while(True):
+                if idnum is not None:
+                    print('hello')
+                    print(idnum.group(0) + request_string)
+                    pages.append(self.get_page_from_graph(idnum.group(0) + request_string))
+                    print(len(pages))
+                    break
+                    num_pages = num_pages + 1
+                    if number_of_pages is not None and num_pages < number_of_pages:
+                        break
 
+                if verbose:
+                    sys.stdout.write("getting page number %d\n" % len(pages))
 
-            #### TODO #####
-            #I can either use requests library as above
-            #or I can extract the id from the returned 'next' string:
-            #https://graph.facebook.com/v2.5/710782929015815/posts?fields=created_time,f........
-            # ie regex to get 710782929015815 and make new string to request from graph
-            # ie graph api explorer request :
-            # 710782929015815/?fields=id,name,posts.since(2010).include_hidden(true){created_time,from,message,comments{created_time,from,message,comments{created_time,from,message},attachment},full_picture}
-            #it would be nice to make a custom iteratable of the posts
+                idnum = re.search('(?<=\/)\d+(?=\/)', pages[-1]['posts']['paging']['next'])
+               
         except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
             print(type(e))
             print(e.args)
             print(e)
     
-            if pages[-1] is not None:
-                if 'posts' in pages[-1]:
-                    request_string = pages[-1]['posts']['paging']['next']
-                    #del pages[-1]['posts']['paging']
-                elif 'paging' in pages[-1]:
-                    print("hi")
-                    request_string = pages[-1]['paging']['next']
-                    pages[-1]['paging']
-                else:
-                    break
-            if self.write_pages:
-                with open( "output_page%s" % (num_pages), 'w') as output:
-                    output.write(str(pages[-1]))
-            if number_of_pages is not None:
-                if num_pages >= number_of_pages:
-                    break
+                # if pages[-1] is not None:
+                #     if 'posts' in pages[-1]:
+                #         request_string = pages[-1]['posts']['paging']['next']
+                #         #del pages[-1]['posts']['paging']
+                #     elif 'paging' in pages[-1]:
+                #         print("hi")
+                #         request_string = pages[-1]['paging']['next']
+                #         pages[-1]['paging']
+                #     else:
+                #         break
+                # if self.write_pages:
+                #     with open( "output_page%s" % (num_pages), 'w') as output:
+                #         output.write(str(pages[-1]))
+            
         if verbose:
             print("received %s pages" % (num_pages))
         self._num_pages = num_pages
@@ -610,10 +612,7 @@ def __prepare_pprint_(args):
 
 if __name__ == "__main__":
     #me?fields=id,name,posts.include_hidden(true){created_time,from,message,comments{created_time,from,message,comments{created_time,from,message},attachment},full_picture}
-    defaultqstring = "me?fields=posts.include_hidden(true)\
-                     {created_time,from,message,comments\
-                     {created_time,from,message,comments\
-                     {created_time,from,message},attachment},full_picture}"
+    defaultqstring = 'me?fields=posts.include_hidden(true){created_time,from,message,comments{created_time,from,message,comments{created_time,from,message},attachment},full_picture}'
     
     parser = argparse.ArgumentParser(epilog="Saving Face with saveface.py", description="Download facebook posts,comments,images etc.\n\
         Default request string is :\n" + defaultqstring)
