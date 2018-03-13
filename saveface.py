@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/env/bin/ python3
 # -*- coding: UTF-8 -*-
 # Copyright (c) <2018> <James Miller>
 
@@ -34,22 +34,21 @@ import requests
 import re
 
 from boundinnerclasses import BoundInnerClass
-import dicttoxml
+from dicttoxml import dicttoxml
 from facepy import GraphAPI
 from facepy import exceptions as fpexceptions
 from pathlib import Path
 from queue import Queue
 from xml.etree import ElementTree as ET
-
+import array
+from bs4 import BeautifulSoup as bs
+import pickle
 ##abstract base class
 ##every time I want to program, I find my lungs being deliberately 
 ##blocked so that my mental acuity disappears, and my logic and recall
 ##skills diminish.  I do not smoke.  #intellectualslavery
 ##abstract base class indeed.
 
-##as an aside, I can't recall if classes extended from abstract base classes 
-##can achieve polymorphism if the extended class has methods that are not
-##in the base class.  Need to read.
 class SaveFaceABC(ABC):
     @abstractmethod
     def __init__(self):
@@ -105,7 +104,7 @@ class SaveFace(SaveFaceABC):
 
         self.filename = ""
         self.filepath = ""
-        self.write_pages = True  #write pages as they are received
+        #self.write_pages = True  #write pages as they are received
         self.pages = [] #the result dictionary
         self.args = {} #the args from command line input
 
@@ -127,7 +126,12 @@ class SaveFace(SaveFaceABC):
             t = SaveFace.__DownloadThread_(queue, self._img_folder)
             t.start()
 
-        queue.join()    
+        queue.join()
+
+    def __update_images_(self, eltuple):
+        self._imgpath_element.append(eltuple)
+        self._num_images += 1
+        self.print_progress(self._num_images, self._images_total)
 
     @BoundInnerClass 
     class __DownloadThread_(threading.Thread):
@@ -138,17 +142,28 @@ class SaveFace(SaveFaceABC):
         Attributes:
             daemon (bool): Description
         """
-        def __init__(self, queue, img_folder):
-            """Summary
-            
-            Args:
-                queue (TYPE): Description
-                img_folder (TYPE): Description
-            """
-            super(SaveFace.__DownloadThread_, self).__init__()
-            self._queue = queue
-            self._destfolder = img_folder
+
+        #def __init__(self, queue, img_folder):
+        """Summary
+        Args:
+            queue (TYPE): Description
+            img_folder (TYPE): Description
+        """
+        lock = threading.Lock()
+        def __init__(self, group=None, target=None, name=None,
+                args=(), kwargs=None, verbose=None):
+            super(SaveFace.__DownloadThread_,self).__init__(group=group, target=target, 
+                name=name, verbose=verbose)
+            self.args = args
+            self.kwargs = kwargs
+            self._queue = kwargs.queue
+            self._destfolder = kwargs.img_folder
             self.daemon = True
+            return
+            # super(SaveFace.__DownloadThread_, self).__init__()
+            # self._queue = queue
+            # self._destfolder = img_folder
+            # self.daemon = True
 
         def run(self):
             """
@@ -176,27 +191,20 @@ class SaveFace(SaveFaceABC):
             """
             print("[%s] Downloading %s -> %s" % (self.ident, el.nodeValue, self._destfolder))
             try:
-                img = urllib.FancyURLopener(el.nextSibling.nodeValue, self._destfolder)
-            #get file tyoe
-                imgtype = img.info().getsubtype()
-            #construct name
-                name = str(outer._num_images) + '.' + imgtype
-                name = name.split('/')[-1]
-            #construct path
-                dest_path = os.path.join(self._destfolder, name)
-            #store path and element to set path in xml later - may need thread.lock
-                outer.imgpath_element.push((dest_path, el))
-            #read file data from urllib stream
-                buf = img.read()
-            #write file data
-                downloaded_image = file(dest_path, "wb")
-                downloaded_image.write(buf)
-                downloaded_image.close()
-            #close urllib stream
-                img.close()
-            #increment counter for name and print progress
-                outer._num_images += 1
-                outer.print_progress(outer._num_images, outer._images_total)
+                r = requests.get(settings.STATICMAP_URL.format(**data), stream=True)
+                if r.status_code == 200:
+                    name = str(outer._num_images) + '.' + re.search('([^\/]+$)', r.headers['content-type'])
+                    name = name.split('/')[-1]
+                #construct path
+                    dest_path = os.path.join(self._destfolder, name)
+                    with open(dest_path, 'wb') as f:
+                        for chunk in r:
+                            f.write(chunk)
+
+                #increment counter for name and print progress
+                with SaveFace.__DownloadThread_.lock.acquire():
+                    outer.__update_images_((el, dest_path))
+
             except (urllib.ContentTooShortError, IOError) as e:
                 print(type(e))
                 print(e.args)
@@ -273,7 +281,7 @@ class SaveFace(SaveFaceABC):
             raise ValueError("request_string must be defined")
 
         try:
-            return requests.get(request_string).json()
+            return json.loads(json.dumps(requests.get(request_string).json()))
         except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError) as e:
             raise e
 
@@ -303,12 +311,9 @@ class SaveFace(SaveFaceABC):
         pages = []
         found = False
         pages.append(self.get_page_from_graph(request_string))
-        #request_string = '/' + request_string[2:]
-        #idnum = re.search('(?<=\/)\d+(?=\/)', pages[-1]['posts']['paging']['next'])
 
         try:
-            while(True):
-            #print(pages[-1])
+            while True:
                 for np in self.dict_extract('next', pages[-1]):
                     found = True
                     pages.append(self.request_page_from_graph(np))
@@ -321,36 +326,29 @@ class SaveFace(SaveFaceABC):
                     break
 
                 if verbose:
-                    sys.stdout.write("getting page number %d\n" % len(pages))
-            #idnum = re.search('(?<=\/)\d+(?=\/)', pages[-1]['posts']['paging']['next'])
-
-
+                    print('received page number {}   '.format(num_pages), end='\r')
 
         except (fpexceptions.OAuthError, fpexceptions.FacebookError, fpexceptions.FacepyError, KeyError) as e:
             print(type(e))
             print(e.args)
             print(e)
-    
-                # if pages[-1] is not None:
-                #     if 'posts' in pages[-1]:
-                #         request_string = pages[-1]['posts']['paging']['next']
-                #         #del pages[-1]['posts']['paging']
-                #     elif 'paging' in pages[-1]:
-                #         print("hi")
-                #         request_string = pages[-1]['paging']['next']
-                #         pages[-1]['paging']
-                #     else:
-                #         break
-                # if self.write_pages:
-                #     with open( "output_page%s" % (num_pages), 'w') as output:
-                #         output.write(str(pages[-1]))
-            
+
         if verbose:
-            print("received %s pages" % (num_pages))
+            print('received {} pages            '.format(num_pages), end='\r')
         self._num_pages = num_pages
         self.pages = pages
         return pages
 
+    #pickle the pages array
+    def save_pages_to_pickle(self):
+        if self.pages is not None:
+            with open('savefacepickle', 'wb') as outfile:
+                pickle.dump(self.pages, outfile)
+
+    def get_pages_from_pickle(self):
+        with open('savefacepickle', 'rb') as infile:
+            self.pages = pickle.load(infile)
+            
     #https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
     def dict_extract(self, key, var):
         if hasattr(var,'items'):
@@ -365,8 +363,8 @@ class SaveFace(SaveFaceABC):
                         for result in self.dict_extract(key, d):
                             yield result
 
-    def init_path(filepath, filename, overwrite):
-        if not Path.exists(filepath):
+    def init_path(self, filename, filepath, overwrite):
+        if not Path(filepath).exists():
             Path(filepath).mkdir(parents=True, exist_ok=True)
 
         file = filepath + filename
@@ -413,17 +411,27 @@ class SaveFace(SaveFaceABC):
             string = string + page
         return string
 
+    def __repr__(self):
+        return "<%s()>" % (self.__class__.__name__)
+
 class SaveFaceXML(SaveFace):
 
     def __init__(self):
-        super().__init__(self)
-        self.root = ET.fromstring('<root></root>')
+        super().__init__()
+        self._root = ET.fromstring("<content></content>")
 
     def get_pages_from_graph(self, graph=None, number_of_pages=None, request_string=None, verbose=True):
-        super().get_pages_from_graph(self, graph, number_of_pages, request_string, verbose)
+        super().get_pages_from_graph(graph, number_of_pages, request_string, verbose)
+        self.__convert_pages_()
+
+    def get_pages_from_pickle(self):
+        super().get_pages_from_pickle()
+        self.__convert_pages_()
+
+    def __convert_pages_(self):
         if len(self.pages):
             for page in self.pages:
-                self.root.append(ET.XML(dicttoxml.dicttoxml(page)))
+                self._root.append(ET.XML(dicttoxml(page, attr_type=False)))
 
     def write(self, filename, filepath, overwrite=True):
         """
@@ -433,16 +441,16 @@ class SaveFaceXML(SaveFace):
             results (str): string to write 
             type (str): Either 'json' or 'xml'
         """
-        super().write(self, filename, filepath, overwrite)
+        super().write(filename, filepath, overwrite)
         try:
-            with open(filename, 'w') as output:
-                self.root.write(output, encoding="unicode", method="xml")
+            with open(filename, 'wb') as output:
+                ET.ElementTree(self._root).write(output, encoding="UTF-8", xml_declaration=True)
         except IOError as e:
             print(type(e))
             print(e.args)
             print(e)
 
-    def get_images(self, results):
+    def get_images(self):
         """
         gets the image urls from the received data
         and calls private function download
@@ -453,13 +461,7 @@ class SaveFaceXML(SaveFace):
         Raises:
             ValueError: Description
         """
-        if results is not dict:
-            raise TypeError("parameter of get_images must be a dictionary")
 
-        if results != {}:
-            xmlstring = dicttoxml.dicttoxml(results, attr_type=False)
-
-        self._root = ET.fromstring(xmlstring)
     #test
         for it in self._root.iterfind('image'):
             print(it)
@@ -470,7 +472,7 @@ class SaveFaceXML(SaveFace):
             elements.push(el.find('src')[0])
         els = self._root.findall('full_picture')
         elements = elements + els
-        print ('hey' + str(len(elements)))
+
         self.__download_(elements)
 
     def embed_file_paths():
@@ -485,7 +487,7 @@ class SaveFaceHTML(SaveFaceXML):
         super().__init__()
 
     #todo - add xml_declaration
-    def write(self, filename, filepath, overwrite=True):
+    def write(self, filename, filepath, method='html', overwrite=True):
         """
             Writes data to file as xml
         
@@ -494,17 +496,26 @@ class SaveFaceHTML(SaveFaceXML):
             filepath (str): path to file
             overwrite(bool): whether to overwrite file 
         """
-        super().write(self, filename, filepath, overwrite)
-        try:
-            with open(filename, 'w') as output:
-                self.root.write(output, encoding="unicode", method='html')
-        except IOError as e:
-            print(type(e))
-            print(e.args)
-            print(e)
+        
+        #super().write(filename, filepath, 'html', overwrite)
+        htmllist = self._root.findall('.//full_picture')
+        for tag in htmllist:
+            tag.insert(0,ET.Element('img', attrib={'src':tag.text}))
+        htmlstring = ET.tostring(self._root, encoding='unicode', method='html')
+
+        with open(filepath + filename, 'w') as output:
+            output.write(bs('<html> \
+                                <head> \
+                                <link rel="stylesheet" href="' +
+                                cssfile +
+                                '><title>' + 
+                                filename + 
+                                '</title></head><body>' + 
+                                htmlstring + 
+                                '</body></html>',"html.parser").prettify())
 
     def __str__(self):
-        return ET.tostring(self.root, encoding="unicode", method="html")
+        return bs(ET.tostring(self._root, encoding='unicode', method='html')).prettify()
 
 class SaveFaceJSON(SaveFace):
 
@@ -525,7 +536,7 @@ class SaveFaceJSON(SaveFace):
         self.json = json.loads(json.dumps(page_string)) #I think
 
     def write(self, filename, filepath, overwrite=True):
-        super().write(self, filename, filepath, overwrite)
+        super().write(filename, filepath, overwrite)
         try:
             with open(filename, 'w') as output:
                 if self._ispretty:
@@ -590,13 +601,23 @@ def process_args(args):
     elif args.format == 'html':
         sf = SaveFaceHTML()
 
-    sf.init_graph(args.O_Auth_tkn)
-    sf.get_pages_from_graph(request_string=args.request_string)
 
-    if args.output == 'stdout':
-        print("hello")#str(sf))
-    else:
-        sf.write(args.output, './')
+    if args.source == 'facebook':
+        sf.init_graph(args.O_Auth_tkn)
+        sf.get_pages_from_graph(request_string=args.request_string)
+    elif args.source == 'pickle':
+        sf.get_pages_from_pickle()
+
+    if args.pickle:
+        sf.save_pages_to_pickle()
+    # if args.images:
+    #     sf.get_images() args.img_folder
+
+    if args.stdout:
+        print(str(sf))
+    
+    if args.filename is not None:
+        sf.write(args.filename, args.filepath)
 
     #images
    # if self.args.images == True:
@@ -638,6 +659,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(epilog="Saving Face with saveface.py", description="Download facebook posts,comments,images etc.\n\
         Default request string is :\n" + defaultqstring)
     
+    parser.add_argument('-g', '--getfrom', metavar='Where to source the pages from', type=str, required=False, nargs='?',
+        default='facebook', help='Optional. Can be one of facebook or pickle. Defaults to facebook',
+        choices=['facebook', 'pickle'],
+        dest='source')
     parser.add_argument('-a', '--auth_tkn', metavar='facebook auth token', type=str, required=True, nargs='?', 
         help='Required. Your app\'s facebook authorisation token', 
         dest='O_Auth_tkn')
@@ -646,21 +671,30 @@ if __name__ == "__main__":
         help='Optional. The request string to query facebook\'s api. Defaults to posts,comments,images',
         dest='request_string')
     parser.add_argument('-f', '--format', metavar='output format for results', type=str, required=False, nargs='?',
-        default='json', help='Optional. Can be one of json, pjson (prettyprinted) or xml. Defaults to json', 
+        default='json', help='Optional. Can be one of json, pjson (prettyprinted), xml or html. Defaults to json', 
         choices=['json', 'pjson', 'xml', 'html'], 
         dest='format')
-    parser.add_argument('-o', '--output', metavar='how to output the results', type=str, required=False, nargs='?',
-        default='stdout', help='Optional. Accepts a string filename. Defaults to stdout', 
-        dest='output')
-    parser.add_argument('-i', '--images', metavar='download images?',  type=bool, required=False, nargs='?',
-        default=False, help='Optional.  A boolean to indicate whether or not to download images. Defaults to false', 
+    parser.add_argument('-o', '--stdout', metavar='output to stdout', type=bool, required=False, nargs='?',
+        default=False, help='Optional. Output to stdout. Defaults to False', 
+        dest='stdout')
+    parser.add_argument('-s', '--save', metavar='pickle the array of pages', type=bool, required=False, nargs='?',
+        default=False, help='Optional. Use Pickle to store the array of pages. Defaults to False', 
+        dest='pickle')
+    parser.add_argument('-n', '--filename', metavar='filename for the output', type=str, required=False, nargs='?',
+        default=None, help='Optional. A filename for the results.  Results will not be saved without filename being specified',
+        dest="filename")
+    parser.add_argument('-l', '--location', metavar='filepath for the output', type=str, required=False, nargs='?',
+        default='./', help='Optional. A filepath for the results file. Defaults to ./',
+        dest='filepath')
+    parser.add_argument('-p', '--pprint_options', metavar='pprint options', type=str, required=False, nargs='*',
+        default='[indent=4, width=80, depth=None]', help="Optional. Options for pprint module.\n\
+        key=value with comma ie -p [indent=4, depth=80]",
+        dest='pprint_opts')
+    parser.add_argument('-i', '--images', metavar='download images?', type=bool, required=False, nargs='?',
+        default=False, help='Optional.  A boolean to indicate whether or not to download images. Defaults to False',
         dest='images')
     parser.add_argument('-d', '--image_path', metavar='path to images', type=str, required=False, nargs='?',
         default='images', help='Optional. The path to the images folder. Defaults to ./images', 
         dest='img_folder')
-    parser.add_argument('-p', '--pprint_options', metavar='pprint options', type=str, required=False, nargs='*',
-        default='indent=4, width=80, depth=None', help="Optional. Options string for pprint module.\n\
-        Parameters must be named key=value with no comma ie indent=4 depth=80.",
-        dest='pprint_opts')
 
     process_args(parser.parse_args())
