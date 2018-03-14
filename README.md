@@ -51,12 +51,12 @@ comma ie -p [indent=4, depth=80]<br>
     The path to the images folder. Defaults to ./images<br>
 -c [css filename], --css [css filename] Optional.<br>
     The filename of the css file. Defaults to saveface.css</p>
-<p>Saving Face with <a href="http://saveface.py">saveface.py</a></p>
+<p>Saving Face with <a href="http://github.com/millerthegorilla/saveface.py">saveface.py</a></p>
 <p>Currently this will download json, xml, or html (which I’m in the process of styling).<br>
 The next step is a config file, which will include a templated html representation.<br>
 Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTk0Njg0Njk5Ml19
+eyJoaXN0b3J5IjpbLTEzOTU1ODIyOTJdfQ==
 -->
