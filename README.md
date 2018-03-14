@@ -39,8 +39,8 @@ Defaults to False<br>
 -n [filename for the output], --filename [filename for the output]<br>
 Optional. A filename for the results. Results will not<br>
 be saved without filename being specified<br>
--l [filepath for the output], --location [filepath for the output]<br>
-Optional. A filepath for the results file. Defaults to<br>
+-l [filepath for the output], --location [filepath for the output] Optional.<br>
+    A filepath for the results file. Defaults to<br>
 ./<br>
 -p [pprint options [pprint options …]], --pprint_options [pprint options [pprint options …]] Optional.<br>
     Options for pprint module. key=value with comma ie -p [indent=4, depth=80]<br>
@@ -57,5 +57,5 @@ Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE2MTQ5MzU0MzZdfQ==
+eyJoaXN0b3J5IjpbLTI3NDY4NzQ2NF19
 -->
