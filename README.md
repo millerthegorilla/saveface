@@ -21,11 +21,11 @@ me?fields=posts.include_hidden(true) {created_time,from,message,comments<br>
 <p>optional arguments:<br>
 -h, --help            show this help message and exit<br>
 -g [Where to source the pages from], --getfrom [Where to source the pages from] Optional.<br>
-    Can be one of facebook or pickle. Defaults to facebook<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Can be one of facebook or pickle. Defaults to facebook<br>
 -a [facebook auth token], --auth_tkn [facebook auth token] Optional. Your app’s facebook<br>
-authorisation token.  Must be present if you are not sourcing results from a pickle<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;authorisation token.  Must be present if you are not sourcing results from a pickle<br>
 -r [rest api request string], --request_string [rest api request string] Optional.<br>
-    The request string to query facebook’s api. Defaults to posts,comments,images<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The request string to query facebook’s api. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Defaults to posts,comments,images<br>
 -f [output format for results], --format [output format for results] Optional.<br>
      Can be one of json, pjson (prettyprinted), xml or html. Defaults to json<br>
 -o [output to stdout], --stdout [output to stdout] Optional.<br>
@@ -51,5 +51,5 @@ Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTAzNzc1NjU3Nl19
+eyJoaXN0b3J5IjpbNzM4MjI4NTEyXX0=
 -->
