@@ -45,11 +45,12 @@ Optional. A filepath for the results file. Defaults to<br>
 -p [pprint options [pprint options …]], --pprint_options [pprint options [pprint options …]]<br>
 Optional. Options for pprint module. key=value with<br>
 comma ie -p [indent=4, depth=80]<br>
--i [download images?], --images [download images?] Optional. </br>
+-i [download images?], --images [download images?]  Optional. <br>
 	 A boolean to indicate whether or not to download images. Defaults to False<br>
--d [path to images], --image_path [path to images] Optional. The path to the images folder. Defaults to ./images<br>
--c [css filename], --css [css filename]<br>
-Optional. The filename of the css file. Defaults to saveface.css</p>
+-d [path to images], --image_path [path to images]     Optional. <br>
+    The path to the images folder. Defaults to ./images<br>
+-c [css filename], --css [css filename] Optional.<br>
+    The filename of the css file. Defaults to saveface.css</p>
 <p>Saving Face with <a href="http://saveface.py">saveface.py</a></p>
 <p>Currently this will download json, xml, or html (which I’m in the process of styling).<br>
 The next step is a config file, which will include a templated html representation.<br>
@@ -57,5 +58,5 @@ Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTc1OTc4NzE0N119
+eyJoaXN0b3J5IjpbLTk0Njg0Njk5Ml19
 -->
