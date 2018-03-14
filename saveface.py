@@ -525,34 +525,51 @@ class SaveFaceHTML(SaveFaceXML):
             overwrite(bool): whether to overwrite file
         """
         # super().write(filename, filepath, 'html', overwrite)
+        def htmlwrap(element_list, wrapper_element, tags):
+            for element in element_list:
+                wrap_element = ET.Element(wrapper_element.tag,
+                                          wrapper_element.attrib)
+                for el in list(element):
+                    if el.tag in tags:
+                        element.remove(el)
+                        wrap_element.append(el)
+                element.insert(0, wrap_element)
+
+        paginlist = self._root.findall('.//pagination/.')
+        paginlist = paginlist + self._root.findall('.//paging/.')
+        for paging in paginlist:
+            paging.clear()
 
         # images
         htmllist = self._root.findall('.//full_picture')
-        for tag in htmllist:
-            tag.insert(0, ET.Element('img', attrib={'class': 'image',
-                                                    'src': tag.text}))
-        # divs
-        els = self._root.findall('.//item/..')
-        for el in els:
-            div = ET.Element('div', attrib={'class': 'item'})
-            for e in list(el):
-                el.remove(e)
-                div.append(e)
-            el.append(div)
+        for el in htmllist:
+            el.insert(0, ET.Element('img', attrib={'class': 'image',
+                                                   'src': el.text}))
+            el.text = None
 
-        itemlist = self._root.findall('.//item/.')
-        for item in itemlist:
-            div1 = ET.Element('div', attrib={'class': 'from'})
-            div2 = ET.Element('div', attrib={'class': 'message'})
-            for el in list(item):
-                if el.tag in ['created_time', 'from']:
-                    item.remove(el)
-                    div1.append(el)
-                if el.tag in ['message']:
-                    item.remove(el)
-                    div2.append(el)
-            item.insert(0, div1)
-            item.insert(1, div2)
+        htmlwrap(self._root.findall('.//from/.'),
+                 ET.Element('div', attrib={'class': 'user'}),
+                 ['id'])
+
+        for i in self._root.findall('.//item/.'):
+            div = ET.Element('div', attrib={'class': 'user'})
+            el = i.find('id')
+            div.append(el)
+            i.remove(el)
+            i.append(div)
+
+        htmlwrap(self._root.findall('.//item/.'),
+                 ET.Element('div', attrib={'class': 'from'}),
+                 ['created_time', 'from'])
+        htmlwrap(self._root.findall('.//item/.'),
+                 ET.Element('div', attrib={'class': 'message'}),
+                 ['message'])
+        htmlwrap(self._root.findall('.//item/..'),
+                 ET.Element('div', attrib={'class': 'item'}),
+                 ['item'])
+        htmlwrap(self._root.findall('.//item/.'),
+                 ET.Element('div', attrib={'class': 'picture'}),
+                 ['full_picture'])
 
         htmlstring = ET.tostring(self._root, encoding='unicode', method='html')
 
@@ -735,9 +752,10 @@ if __name__ == "__main__":
                         dest='source')
     parser.add_argument('-a', '--auth_tkn',
                         metavar='facebook auth token',
-                        type=str, required=True, nargs='?',
-                        help='Required. Your app\'s facebook \
-                              authorisation token',
+                        type=str, required=False, nargs='?',
+                        help='Optional. Your app\'s facebook \
+                              authorisation token. Must be set \
+                              to retrieve from facebook (see -g)',
                         dest='O_Auth_tkn')
     parser.add_argument('-r', '--request_string',
                         metavar='rest api request string',
