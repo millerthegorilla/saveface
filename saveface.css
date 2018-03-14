@@ -1,0 +1,30 @@
+@charset "UTF-8";
+
+content {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+content * {
+	flex-direction: row;
+	max-width: 85vw;
+}
+
+content .item {
+	background-color: #253DCC;
+	align-content: center;
+
+}
+
+content .from {
+
+}
+
+content .message {
+
+}
+
+content .image {
+	max-width: 50vw;
+}
