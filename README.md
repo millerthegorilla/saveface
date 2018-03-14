@@ -45,9 +45,8 @@ Optional. A filepath for the results file. Defaults to<br>
 -p [pprint options [pprint options …]], --pprint_options [pprint options [pprint options …]]<br>
 Optional. Options for pprint module. key=value with<br>
 comma ie -p [indent=4, depth=80]<br>
--i [download images?], --images [download images?]<br>
-Optional. A boolean to indicate whether or not to<br>
-download images. Defaults to False<br>
+-i [download images?], --images [download images?] Optional. </br>
+	 A boolean to indicate whether or not to download images. Defaults to False<br>
 -d [path to images], --image_path [path to images] Optional. The path to the images folder. Defaults to ./images<br>
 -c [css filename], --css [css filename]<br>
 Optional. The filename of the css file. Defaults to saveface.css</p>
@@ -58,5 +57,5 @@ Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMjY5NTEyNTI2XX0=
+eyJoaXN0b3J5IjpbMTc1OTc4NzE0N119
 -->
