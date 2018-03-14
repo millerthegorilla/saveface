@@ -25,14 +25,12 @@ Optional. Can be one of facebook or pickle. Defaults<br>
 to facebook<br>
 -a [facebook auth token], --auth_tkn [facebook auth token]<br>
 Required. Your app’s facebook authorisation token<br>
--r [rest api request string], --request_string [rest api request string]<br>
-Optional. The request string to query facebook’s api.<br>
-Defaults to posts,comments,images<br>
--f [output format for results], --format [output format for results]<br>
-Optional. Can be one of json, pjson (prettyprinted),<br>
-xml or html. Defaults to json<br>
--o [output to stdout], --stdout [output to stdout]<br>
-Optional. Output to stdout. Defaults to False<br>
+-r [rest api request string], --request_string [rest api request string] Optional.<br>
+    The request string to query facebook’s api. Defaults to posts,comments,images<br>
+-f [output format for results], --format [output format for results] Optional.<br>
+     Can be one of json, pjson (prettyprinted), xml or html. Defaults to json<br>
+-o [output to stdout], --stdout [output to stdout] Optional.<br>
+    Output to stdout. Defaults to False<br>
 -s [pickle the array of pages], --save [pickle the array of pages] Optional. <br>
     Use Pickle to store the array of pages. Defaults to False<br>
 -n [filename for the output], --filename [filename for the output] Optional. <br>
@@ -54,5 +52,5 @@ Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTE1NzkwNDMyMDhdfQ==
+eyJoaXN0b3J5IjpbLTUzMTk5NzY1Nl19
 -->
