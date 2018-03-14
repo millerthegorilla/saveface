@@ -33,15 +33,12 @@ Optional. Can be one of json, pjson (prettyprinted),<br>
 xml or html. Defaults to json<br>
 -o [output to stdout], --stdout [output to stdout]<br>
 Optional. Output to stdout. Defaults to False<br>
--s [pickle the array of pages], --save [pickle the array of pages]<br>
-Optional. Use Pickle to store the array of pages.<br>
-Defaults to False<br>
--n [filename for the output], --filename [filename for the output]<br>
-Optional. A filename for the results. Results will not<br>
-be saved without filename being specified<br>
+-s [pickle the array of pages], --save [pickle the array of pages] Optional. <br>
+    Use Pickle to store the array of pages. Defaults to False<br>
+-n [filename for the output], --filename [filename for the output] Optional. <br>
+    A filename for the results. Results will not be saved without filename being specified<br>
 -l [filepath for the output], --location [filepath for the output] Optional.<br>
-    A filepath for the results file. Defaults to<br>
-./<br>
+    A filepath for the results file. Defaults to ./<br>
 -p [pprint options [pprint options …]], --pprint_options [pprint options [pprint options …]] Optional.<br>
     Options for pprint module. key=value with comma ie -p [indent=4, depth=80]<br>
 -i [download images?], --images [download images?]  Optional. <br>
@@ -57,5 +54,5 @@ Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTI3NDY4NzQ2NF19
+eyJoaXN0b3J5IjpbLTE1NzkwNDMyMDhdfQ==
 -->
