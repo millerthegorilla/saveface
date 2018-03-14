@@ -60,3 +60,6 @@ The next step is a config file, which will include a templated html representati
 Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbNTA2NzcxODcwXX0=
+-->
