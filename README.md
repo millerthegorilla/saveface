@@ -42,9 +42,8 @@ be saved without filename being specified<br>
 -l [filepath for the output], --location [filepath for the output]<br>
 Optional. A filepath for the results file. Defaults to<br>
 ./<br>
--p [pprint options [pprint options …]], --pprint_options [pprint options [pprint options …]]<br>
-Optional. Options for pprint module. key=value with<br>
-comma ie -p [indent=4, depth=80]<br>
+-p [pprint options [pprint options …]], --pprint_options [pprint options [pprint options …]] Optional.<br>
+    Options for pprint module. key=value with comma ie -p [indent=4, depth=80]<br>
 -i [download images?], --images [download images?]  Optional. <br>
 	 A boolean to indicate whether or not to download images. Defaults to False<br>
 -d [path to images], --image_path [path to images]     Optional. <br>
@@ -58,5 +57,5 @@ Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTEzOTU1ODIyOTJdfQ==
+eyJoaXN0b3J5IjpbLTE2MTQ5MzU0MzZdfQ==
 -->
