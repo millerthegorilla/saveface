@@ -23,8 +23,8 @@ me?fields=posts.include_hidden(true) {created_time,from,message,comments<br>
 -g [Where to source the pages from], --getfrom [Where to source the pages from]<br>
 Optional. Can be one of facebook or pickle. Defaults<br>
 to facebook<br>
--a [facebook auth token], --auth_tkn [facebook auth token]<br>
-Required. Your app’s facebook authorisation token<br>
+-a [facebook auth token], --auth_tkn [facebook auth token] Optional. Your app’s facebook<br>
+authorisation token.  Must be present if you are not sourcing results from a pickle
 -r [rest api request string], --request_string [rest api request string] Optional.<br>
     The request string to query facebook’s api. Defaults to posts,comments,images<br>
 -f [output format for results], --format [output format for results] Optional.<br>
@@ -52,5 +52,5 @@ Eventually it will be able to make a local copy of images, referenced from<br>
 the xml file by relative file paths to the local copies.</p>
 
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTUzMTk5NzY1Nl19
+eyJoaXN0b3J5IjpbLTc4MDQwMzU0Ml19
 -->
