@@ -4,8 +4,36 @@
 ---
 
 <h1 id="saveface.py"><a href="http://saveface.py">saveface.py</a></h1>
-<hr>
-<p>[pickle the array of pages]<br>
+<p>python script to download facebook posts and comments etc using graph api through facepy</p>
+<p>usage: python <a href="http://saveface.py">saveface.py</a> [-h] [-g [Where to source the pages from]] -a<br>
+[facebook auth token] [-r [rest api request string]]<br>
+[-f [output format for results]] [-o [output to stdout]]<br>
+[-s [pickle the array of pages]]<br>
+[-n [filename for the output]]<br>
+[-l [filepath for the output]]<br>
+[-p [pprint options [pprint options …]]]<br>
+[-i [download images?]] [-d [path to images]]<br>
+[-c [css filename]]</p>
+<p>Download facebook posts, comments,images etc. Default request string is :<br>
+me?fields=posts.include_hidden(true) {created_time,from,message,comments<br>
+{created_time,from,message,comments<br>
+{created_time,from,message},attachment},full_picture}</p>
+<p>optional arguments:<br>
+-h, --help            show this help message and exit<br>
+-g [Where to source the pages from], --getfrom [Where to source the pages from]<br>
+Optional. Can be one of facebook or pickle. Defaults<br>
+to facebook<br>
+-a [facebook auth token], --auth_tkn [facebook auth token]<br>
+Required. Your app’s facebook authorisation token<br>
+-r [rest api request string], --request_string [rest api request string]<br>
+Optional. The request string to query facebook’s api.<br>
+Defaults to posts,comments,images<br>
+-f [output format for results], --format [output format for results]<br>
+Optional. Can be one of json, pjson (prettyprinted),<br>
+xml or html. Defaults to json<br>
+-o [output to stdout], --stdout [output to stdout]<br>
+Optional. Output to stdout. Defaults to False<br>
+-s [pickle the array of pages], --save [pickle the array of pages]<br>
 Optional. Use Pickle to store the array of pages.<br>
 Defaults to False<br>
 -n [filename for the output], --filename [filename for the output]<br>
