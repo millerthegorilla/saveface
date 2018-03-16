@@ -48,21 +48,47 @@ table {
 	border-spacing: 0;
 }
 
+
+
+
+/*font-family: 'Inconsolata', monospace;*/
+
+/*    font-family: 'Oxygen', sans-serif;*/
+
+/*    font-family: 'Nanum Gothic', sans-serif;*/
+@font-face {
+  font-family: 'Inconsolata';
+  src: url('Inconsolata-Regular.ttf');
+}
+
 content {
 	display: flex;
 	flex-direction: column;
-	align-items: center;
+	justify-content: space-around;
+	font-family: 'courier new', monospace;
+	font-size: 1.5rem;
 }
 
 content * {
+	display: flex;
 	flex-direction: row;
 	max-width: 85vw;
+	padding: 2vh;
 }
 
-content .item {
+content .page {
+	display: flex;
+	flex-direction: column;
+}
+
+content .post {
+	display: flex;
+	flex-direction: column;
 	background-color: #253DCC;
 	align-content: center;
-
+	border: 5px;
+	border-color: white;
+	margin-bottom: 5px;
 }
 
 content .from {
@@ -70,6 +96,8 @@ content .from {
 	justify-content: center;
 	padding: 10px;
 	border: 1px;
+	font-family: helvetica, monospace;
+	font-size: 1.1rem;
 
 }
 
@@ -79,7 +107,18 @@ content .message {
 	padding: 10px;
 }
 
-content .picture {
+content .comments {
+	display: flex;
+	flex-direction: column;
+}
+
+content .comments .item {
+	display: flex;
+	flex-direction: column;
+}
+
+
+content .full_picture {
 	display: flex;
 	justify-content: center;
 	padding: 10px;
@@ -90,4 +129,9 @@ content .image {
 	justify-content: space-around;
 	max-width: 15vw;
 	max-height: 15vh;
+}
+
+content .id {
+	display: flex;
+	justify-content: space-between;
 }

@@ -33,6 +33,7 @@ import threading
 import requests
 import re
 
+from argparse import RawTextHelpFormatter
 from boundinnerclasses import BoundInnerClass
 from dicttoxml import dicttoxml
 from facepy import GraphAPI
@@ -40,7 +41,7 @@ from facepy import exceptions as fpexceptions
 from pathlib import Path
 from queue import Queue
 from xml.etree import ElementTree as ET
-import array
+
 from bs4 import BeautifulSoup as bs
 import pickle
 
@@ -121,6 +122,8 @@ class SaveFace(SaveFaceABC):
         self.filename = ""
         self.filepath = ""
         self.pages = []  # the result dictionary
+        self.posts = []
+        self.post_classes = []  # the post class objects
         self.args = {}  # the args from command line input
 
     def __download_(self, elements, numthreads=4):
@@ -174,7 +177,6 @@ class SaveFace(SaveFaceABC):
             self._queue = kwargs.queue
             self._destfolder = kwargs.img_folder
             self.daemon = True
-            return
             # super(SaveFace.__DownloadThread_, self).__init__()
             # self._queue = queue
             # self._destfolder = img_folder
@@ -210,7 +212,8 @@ class SaveFace(SaveFaceABC):
                 r = requests.get(settings.STATICMAP_URL.format(**data),
                                  stream=True)
                 if r.status_code == 200:
-                    name = str(outer._num_images) + '.' + re.search('([^\/]+$)', r.headers['content-type'])
+                    name = str(outer._num_images) + '.' + re.search
+                    ('([^\/]+$)', r.headers['content-type'])
                     name = name.split('/')[-1]
                 # construct path
                     dest_path = os.path.join(self._destfolder, name)
@@ -347,8 +350,8 @@ class SaveFace(SaveFaceABC):
                     break
 
                 if verbose:
-                    print('received page number {}   '.format(num_pages),
-                          end='\r')
+                    print('received \
+                        page number {}   '.format(num_pages), end="\r")
 
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
@@ -362,7 +365,42 @@ class SaveFace(SaveFaceABC):
             print('received {} pages            '.format(num_pages), end='\r')
         self._num_pages = num_pages
         self.pages = pages
+        self.__format_()
         return pages
+
+    def __format_(self):
+        pass
+
+    def get_posts_from_pages(self):
+        if self.pages is not None:
+            self.posts = self.pages[0]['posts']['data']
+            for i in self.pages[1:]:
+                self.posts = self.posts + i['data']
+            for i in self.posts:
+                if 'comments' in i:
+                    i['comments'] = i['comments']['data']
+                    for j in i['comments']:
+                        if 'comments' in j:
+                            j['comments'] = j['comments']['data']
+        return self.posts
+
+    def get_posts_as_classes(self):
+
+        class Post:
+            @classmethod
+            def from_dict(cls, dict):
+                obj = cls()
+                obj.__dict__.update(dict)
+                return obj
+
+        if len(self.posts):
+            for i in self.posts:
+                self.post_classes.append
+                (json.loads(json.dumps(i), object_hook=Post.from_dict))
+        else:
+            raise ValueError("posts list is empty. \
+                             Call get_posts_from_pages first!")
+        return self.post_classes
 
     # pickle the pages array
     def save_pages_to_pickle(self):
@@ -373,6 +411,7 @@ class SaveFace(SaveFaceABC):
     def get_pages_from_pickle(self):
         with open('savefacepickle', 'rb') as infile:
             self.pages = pickle.load(infile)
+        self.__format_()
 
     # https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
     def dict_extract(self, key, var):
@@ -443,7 +482,8 @@ class SaveFace(SaveFaceABC):
 class SaveFaceXML(SaveFace):
     def __init__(self):
         super().__init__()
-        self._root = ET.fromstring("<content></content>")
+        self.xml = ET.fromstring("<content></content>")
+        self.xmlposts = []
 
     def get_pages_from_graph(self, graph=None, number_of_pages=None,
                              request_string=None, verbose=True):
@@ -451,16 +491,21 @@ class SaveFaceXML(SaveFace):
                                      number_of_pages,
                                      request_string,
                                      verbose)
-        self.__convert_pages_()
+        self.__format_()
 
     def get_pages_from_pickle(self):
         super().get_pages_from_pickle()
-        self.__convert_pages_()
+        self.__format_()
 
-    def __convert_pages_(self):
+    def get_posts_from_pages(self):
+        super().get_posts_from_pages()
+        for p in self.posts:
+            self.xmlposts.append(ET.XML(dicttoxml(p, attr_type=False, custom_root='post')))
+
+    def __format_(self):
         if len(self.pages):
             for page in self.pages:
-                self._root.append(ET.XML(dicttoxml(page, attr_type=False)))
+                self.xml.append(ET.XML(dicttoxml(page, attr_type=False, custom_root='page')))
 
     def write(self, filename, filepath, overwrite=True):
         """
@@ -472,9 +517,9 @@ class SaveFaceXML(SaveFace):
         super().write(filename, filepath, overwrite)
         try:
             with open(filename, 'wb') as output:
-                ET.ElementTree(self._root).write(output,
-                                                 encoding="UTF-8",
-                                                 xml_declaration=True)
+                ET.ElementTree(self.xml).write(output,
+                                               encoding="UTF-8",
+                                               xml_declaration=True)
         except IOError as e:
             print(type(e))
             print(e.args)
@@ -490,33 +535,130 @@ class SaveFaceXML(SaveFace):
             ValueError: Description
         """
         # test
-        for it in self._root.iterfind('image'):
+        for it in self.xml.iterfind('image'):
             print(it)
 
         elements = []
-        els = self._root.findall('image')
+        els = self.xml.findall('image')
         for el in els:
             elements.push(el.find('src')[0])
-        els = self._root.findall('full_picture')
+        els = self.xml.findall('full_picture')
         elements = elements + els
-
         self.__download_(elements)
 
     def embed_file_paths():
         pass  # TODO
 
     def __str__(self):
-        return ET.tostring(self.root, encoding="unicode", method="xml")
+        return ET.tostring(self.xml, encoding="unicode", method="xml")
 
 
 class SaveFaceHTML(SaveFaceXML):
 
     def __init__(self):
         super().__init__()
+        self.html = ''
+
+    def get_pages_from_graph(self, graph=None, number_of_pages=None,
+                             request_string=None, verbose=True):
+        super().get_pages_from_graph(graph,
+                                     number_of_pages,
+                                     request_string,
+                                     verbose)
+        self.__format_()
+
+    def get_pages_from_pickle(self):
+        super().get_pages_from_pickle()
+        self.__format_()
+
+    def __format_(self, cssfile='saveface.css'):
+        self.xhtml = ET.fromstring("<content></content>")
+        super().get_posts_from_pages()
+
+        if len(self.xmlposts):
+            for p in self.xmlposts:
+                self.xhtml.append(p)
+
+        htmllist = self.xhtml.findall('.//full_picture')
+        for el in htmllist:
+            el.insert(0, ET.Element('img', attrib={'class': 'image',
+                                                   'src': el.text}))
+            el.text = None
+
+        for el in self.xhtml.iter():
+            if el.tag is not 'img':
+                el.attrib = {'class': el.tag, **el.attrib}
+                el.tag = 'div'
+
+        self.xhtml.tag = 'content'
+
+        self.html = '<html> \
+                    <head> \
+                    <link rel="stylesheet"' + \
+                    'href="' + cssfile + '">' + \
+                    '<title>SaveFacePie</title>' + \
+                    '</head><body>' + \
+                    ET.tostring(self.xhtml,
+                                encoding='unicode',
+                                method='html') + \
+                    '</body></html>'
+        # self.xml.find('.//root').append
+        # (self.xml.find('.//root/posts/data'))
+
+        # self.xml.find('.//root/posts/..').remove
+        # (self.xml.find('.//root/posts'))
+
+        # newroot = ET.fromstring("<content></content>")
+        # for i in self.xml.findall('.//data'):
+        #     newroot.append(i)
+
+        # self.xml = newroot
+        # # images
+        
+
+        # for i in self._root.findall('.//item/id/.'):
+        #     e = ET.Element('p', attrib={'class': 'title post'})
+        #     e.text = 'post id : ' + i.text
+        #     i.append(e)
+        #     i.text = None
+
+        # for i in self._root.findall('.//paging/..'):
+        #     i.remove(i.find('./paging'))
+
+        # for i in self._root.findall('.//item/.'):
+        #     i.attrib = {'class': 'post'}
+
+        # htmlwrap(self._root.findall('.//item/..'),
+        #          ET.Element('div', attrib={'class': 'page'}),
+        #          ['item'])
+        # htmlwrap(self._root.findall('.//from/.'),
+        #          ET.Element('div', attrib={'class': 'user id'}),
+        #          ['id'])
+        # htmlwrap(self._root.findall('.//item/.'),
+        #          ET.Element('div', attrib={'class': 'from'}),
+        #          ['created_time', 'from'])
+        # htmlwrap(self._root.findall('.//item/.'),
+        #          ET.Element('div', attrib={'class': 'picture'}),
+        #          ['full_picture'])
+        # htmlwrap(self._root.findall('.//item/.'),
+        #          ET.Element('div', attrib={'class': 'post msg'}),
+        #          ['message'])
+        # htmlwrap(self._root.findall('.//item/.'),
+        #          ET.Element('div', attrib={'class': 'post id'}),
+        #          ['id'])
+
+    def htmlwrap(element_list, wrapper_element, tags):
+        for element in element_list:
+            wrap_element = ET.Element(wrapper_element.tag,
+                                      wrapper_element.attrib)
+            for el in list(element):
+                if el.tag in tags:
+                    element.remove(el)
+                    wrap_element.append(el)
+            element.append(wrap_element)
 
     # todo - add xml_declaration
-    def write(self, filename, filepath, method='html',
-              cssfile='saveface.css', overwrite=True):
+    def write(self, filename, filepath, method='html', overwrite=True):
         """
             Writes data to file as xml
         Args:
@@ -525,69 +667,12 @@ class SaveFaceHTML(SaveFaceXML):
             overwrite(bool): whether to overwrite file
         """
         # super().write(filename, filepath, 'html', overwrite)
-        def htmlwrap(element_list, wrapper_element, tags):
-            for element in element_list:
-                wrap_element = ET.Element(wrapper_element.tag,
-                                          wrapper_element.attrib)
-                for el in list(element):
-                    if el.tag in tags:
-                        element.remove(el)
-                        wrap_element.append(el)
-                element.insert(0, wrap_element)
-
-        paginlist = self._root.findall('.//pagination/.')
-        paginlist = paginlist + self._root.findall('.//paging/.')
-        for paging in paginlist:
-            paging.clear()
-
-        # images
-        htmllist = self._root.findall('.//full_picture')
-        for el in htmllist:
-            el.insert(0, ET.Element('img', attrib={'class': 'image',
-                                                   'src': el.text}))
-            el.text = None
-
-        htmlwrap(self._root.findall('.//from/.'),
-                 ET.Element('div', attrib={'class': 'user'}),
-                 ['id'])
-
-        for i in self._root.findall('.//item/.'):
-            div = ET.Element('div', attrib={'class': 'user'})
-            el = i.find('id')
-            div.append(el)
-            i.remove(el)
-            i.append(div)
-
-        htmlwrap(self._root.findall('.//item/.'),
-                 ET.Element('div', attrib={'class': 'from'}),
-                 ['created_time', 'from'])
-        htmlwrap(self._root.findall('.//item/.'),
-                 ET.Element('div', attrib={'class': 'message'}),
-                 ['message'])
-        htmlwrap(self._root.findall('.//item/..'),
-                 ET.Element('div', attrib={'class': 'item'}),
-                 ['item'])
-        htmlwrap(self._root.findall('.//item/.'),
-                 ET.Element('div', attrib={'class': 'picture'}),
-                 ['full_picture'])
-
-        htmlstring = ET.tostring(self._root, encoding='unicode', method='html')
-
         with open(filepath + filename, 'w') as output:
-            output.write(bs('<html> \
-                            <head> \
-                            <link rel="stylesheet"' +
-                            'href="' + cssfile + '">' +
-                            '<title>' + filename + '</title>' +
-                            '</head><body>' +
-                            htmlstring +
-                            '</body></html>',
+            output.write(bs(self.html,
                             "html.parser").prettify())
 
     def __str__(self):
-        return bs(ET.tostring(self._root,
-                              encoding='unicode',
-                              method='html')).prettify()
+        return bs(self.html, "html.parser").prettify()
 
 
 class SaveFaceJSON(SaveFace):
@@ -697,12 +782,12 @@ def process_args(args):
     if args.filename is not None:
         sf.write(args.filename, args.filepath)
 
-   # images
-   # if self.args.images == True:
-        #self.sf.get_images(result)
-        #exchange the text in the url nodes from the node list
-        #with local filepaths
-        #TODO
+    # images
+    # if self.args.images == True:
+        # self.sf.get_images(result)
+        # exchange the text in the url nodes from the node list
+        # with local filepaths
+        # TODO
 
 
 def __prepare_pprint_(args):
@@ -737,7 +822,7 @@ if __name__ == "__main__":
                      {created_time,from,message,comments \
                      {created_time,from,message},attachment},full_picture}'
     parser = argparse.ArgumentParser(epilog="Saving Face with saveface.py",
-                                     description="Download facebook posts, \
+                                     description="Download your facebook posts, \
                                                   comments,images etc.\n\
                                                   Default request \
                                                   string is :\n\
@@ -746,8 +831,8 @@ if __name__ == "__main__":
                         metavar='Where to source the pages from',
                         type=str, required=False, nargs='?',
                         default='facebook',
-                        help='Optional. Can be one of facebook or pickle. \
-                              Defaults to facebook',
+                        help='Optional. Can be one of facebook or pickle.\n\
+                              Defaults to facebook\n',
                         choices=['facebook', 'pickle'],
                         dest='source')
     parser.add_argument('-a', '--auth_tkn',
@@ -763,7 +848,7 @@ if __name__ == "__main__":
                         default=defaultqstring,
                         help='Optional. The request string \
                               to query facebook\'s api. \
-                              Defaults to posts,comments,images',
+                              Default request string above',
                         dest='request_string')
     parser.add_argument('-f', '--format',
                         metavar='output format for results',
