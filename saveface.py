@@ -1,7 +1,6 @@
 #!/usr/env/bin/ python3
-# -*- coding: UTF-8 -*-
 # Copyright (c) <2018> <James Miller>
-
+# -*- coding: utf-8 -*-
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -32,6 +31,7 @@ import sys
 import threading
 import requests
 import re
+import html
 
 from argparse import RawTextHelpFormatter
 from boundinnerclasses import BoundInnerClass
@@ -41,6 +41,7 @@ from facepy import exceptions as fpexceptions
 from pathlib import Path
 from queue import Queue
 from xml.etree import ElementTree as ET
+from xml.sax.saxutils import unescape
 
 from bs4 import BeautifulSoup as bs
 import pickle
@@ -373,16 +374,20 @@ class SaveFace(SaveFaceABC):
 
     def get_posts_from_pages(self):
         if self.pages is not None:
-            self.posts = self.pages[0]['posts']['data']
-            for i in self.pages[1:]:
-                self.posts = self.posts + i['data']
-            for i in self.posts:
-                if 'comments' in i:
-                    i['comments'] = i['comments']['data']
-                    for j in i['comments']:
-                        if 'comments' in j:
-                            j['comments'] = j['comments']['data']
-        return self.posts
+            if 'posts' in self.pages:
+                if 'data' in self.pages[0]['posts']:
+                    self.posts = self.pages[0]['posts']['data']
+                    for i in self.pages[1:]:
+                        self.posts = self.posts + i['data']
+                    for i in self.posts:
+                        if 'comments' in i:
+                            i['comments'] = i['comments']['data']
+                            for j in i['comments']:
+                                if 'comments' in j:
+                                    j['comments'] = j['comments']['data']
+                    return self.posts
+            else:
+                self.posts = self.pages
 
     def get_posts_as_classes(self):
 
@@ -575,77 +580,127 @@ class SaveFaceHTML(SaveFaceXML):
         self.xhtml = ET.fromstring("<content></content>")
         super().get_posts_from_pages()
 
+        # convert xmlposts to xhtml
         if len(self.xmlposts):
             for p in self.xmlposts:
                 self.xhtml.append(p)
+                m = p.find('./message')
+                if m is not None:
+                    m.text = m.text.replace('\n', u'<br>')
 
-        htmllist = self.xhtml.findall('.//full_picture')
-        for el in htmllist:
+        # format xhtml
+        if self.xhtml.findall('.//headers') is not None:
+            p = self.xhtml.findall('.//headers/..')
+            for e in p:
+                e.remove(e.find('./headers'))
+
+        if self.xhtml.findall('.//paging') is not None:
+            p = self.xhtml.findall('.//paging/..')
+            for e in p:
+                e.remove(e.find('./paging'))
+
+        for i in self.xhtml.findall('.//attachment/.'):
+            if i.find('./media') is not None:
+                i.remove(i.find('./media'))
+            j = i.find('url')
+            if j is not None and j.text is not None:
+                if i.find('./title') is not None:
+                    title = i.find('./title').text
+                else:
+                    title = "iframe"
+                e = ET.Element('iframe', attrib={'src': j.text,
+                                                 'title': title,
+                                                 'class': 'iframe',
+                                                 'sandbox': ''})
+
+                e.text = "iframe  :  " + j.text
+                i.remove(j)
+                i.append(e)
+                if i.find('./target') is not None:
+                    i.remove(i.find('./target'))
+            else:
+                j = i.find('target')
+                if j is not None and j.text is not None:
+                    if i.find('./title') is not None:
+                        title = i.find('./title').text
+                    else:
+                        title = "iframe"
+                    e = ET.Element('iframe', attrib={'src': j.text,
+                                                     'title': title,
+                                                     'class': iframe,
+                                                     'sandbox': ''})
+                    e.text = "iframe  :  " + j.text
+                    i.remove(j)
+                    i.append(e)
+                    if i.find('./url') is not None:
+                        title = i.find('./url')
+                    else:
+                        title = "iframe"
+
+        for i in self.xhtml.findall('.//comments/.'):
+            e = ET.Element('p', attrib={'class': 'comments-title'})
+            e.text = '<b>Comments</b>'
+            i.insert(0, e)
+
+        if self.xhtml.findall('.//photos/.'):
+            for i in self.xhtml.findall('.//picture/..'):
+                pid = i.find('./id')
+                if pid.text is not None:
+                    a = ET.Element('a',
+                                   attrib={'class': 'photo-link',
+                                           'href': 'https://www.facebook.com/photo.php?fbid=' +
+                                           pid.text,
+                                           'name': pid.text})
+                    a.text = 'picture id : ' + pid.text
+                    pid.insert(0, a)
+                    pid.text = None
+                    pid.tag = 'photo-id'
+            for i in self.xhtml.findall('.//photos/data/item'):
+                i.tag = 'photo'
+
+        for i in self.xhtml.findall('.//item/id/.'):
+            e = ET.Element('p', attrib={'class': 'comment-id'})
+            e.text = 'comment id : ' + i.text
+            i.append(e)
+            i.text = None
+
+        for i in self.xhtml.findall('.//post/id/.'):
+            e = ET.Element('p', attrib={'class': 'post-id'})
+            e.text = 'post id : ' + i.text
+            i.append(e)
+            i.text = None
+
+        p = self.xhtml.findall('.//picture')
+        fp = self.xhtml.findall('.//full_picture')
+        fpp = p + fp
+        for el in fpp:
             el.insert(0, ET.Element('img', attrib={'class': 'image',
                                                    'src': el.text}))
             el.text = None
 
+        for el in self.xhtml.findall('.//created_time'):
+            el.tag = 'a'
+            el.attrib = {'class': 'created_time', 'name': el.text}
+
         for el in self.xhtml.iter():
-            if el.tag is not 'img':
+            if el.tag not in ['img', 'p', 'a']:
                 el.attrib = {'class': el.tag, **el.attrib}
                 el.tag = 'div'
 
         self.xhtml.tag = 'content'
+        htmlstring = ET.tostring(self.xhtml,
+                                 encoding='unicode',
+                                 method='html')
 
-        self.html = '<html> \
-                    <head> \
-                    <link rel="stylesheet"' + \
+        self.html = u'<html>' + \
+                    '<head>' + \
+                    '<link rel="shortcut icon" href="./favicon.ico">' + \
+                    '<link rel="stylesheet"' + \
                     'href="' + cssfile + '">' + \
                     '<title>SaveFacePie</title>' + \
                     '</head><body>' + \
-                    ET.tostring(self.xhtml,
-                                encoding='unicode',
-                                method='html') + \
+                    htmlstring + \
                     '</body></html>'
-        # self.xml.find('.//root').append
-        # (self.xml.find('.//root/posts/data'))
-
-        # self.xml.find('.//root/posts/..').remove
-        # (self.xml.find('.//root/posts'))
-
-        # newroot = ET.fromstring("<content></content>")
-        # for i in self.xml.findall('.//data'):
-        #     newroot.append(i)
-
-        # self.xml = newroot
-        # # images
-        
-
-        # for i in self._root.findall('.//item/id/.'):
-        #     e = ET.Element('p', attrib={'class': 'title post'})
-        #     e.text = 'post id : ' + i.text
-        #     i.append(e)
-        #     i.text = None
-
-        # for i in self._root.findall('.//paging/..'):
-        #     i.remove(i.find('./paging'))
-
-        # for i in self._root.findall('.//item/.'):
-        #     i.attrib = {'class': 'post'}
-
-        # htmlwrap(self._root.findall('.//item/..'),
-        #          ET.Element('div', attrib={'class': 'page'}),
-        #          ['item'])
-        # htmlwrap(self._root.findall('.//from/.'),
-        #          ET.Element('div', attrib={'class': 'user id'}),
-        #          ['id'])
-        # htmlwrap(self._root.findall('.//item/.'),
-        #          ET.Element('div', attrib={'class': 'from'}),
-        #          ['created_time', 'from'])
-        # htmlwrap(self._root.findall('.//item/.'),
-        #          ET.Element('div', attrib={'class': 'picture'}),
-        #          ['full_picture'])
-        # htmlwrap(self._root.findall('.//item/.'),
-        #          ET.Element('div', attrib={'class': 'post msg'}),
-        #          ['message'])
-        # htmlwrap(self._root.findall('.//item/.'),
-        #          ET.Element('div', attrib={'class': 'post id'}),
-        #          ['id'])
 
     def htmlwrap(element_list, wrapper_element, tags):
         for element in element_list:
@@ -668,11 +723,10 @@ class SaveFaceHTML(SaveFaceXML):
         """
         # super().write(filename, filepath, 'html', overwrite)
         with open(filepath + filename, 'w') as output:
-            output.write(bs(self.html,
-                            "html.parser").prettify())
+            output.write(bs(self.html, "html.parser").prettify(formatter=None))
 
     def __str__(self):
-        return bs(self.html, "html.parser").prettify()
+        return bs(self.html, "html.parser").prettify(formatter=None)
 
 
 class SaveFaceJSON(SaveFace):
