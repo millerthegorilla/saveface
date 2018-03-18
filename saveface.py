@@ -374,7 +374,7 @@ class SaveFace(SaveFaceABC):
 
     def get_posts_from_pages(self):
         if self.pages is not None:
-            if 'posts' in self.pages:
+            if 'posts' in self.pages[0]:
                 if 'data' in self.pages[0]['posts']:
                     self.posts = self.pages[0]['posts']['data']
                     for i in self.pages[1:]:
@@ -637,9 +637,14 @@ class SaveFaceHTML(SaveFaceXML):
                     else:
                         title = "iframe"
 
+        for i in self.xhtml.findall('.//posts/.'):
+            e = ET.Element('p', attrib={'class': 'posts-title'})
+            e.text = '<strong>Posts</strong>'
+            i.insert(0, e)
+
         for i in self.xhtml.findall('.//comments/.'):
             e = ET.Element('p', attrib={'class': 'comments-title'})
-            e.text = '<b>Comments</b>'
+            e.text = '<strong>Comments</strong>'
             i.insert(0, e)
 
         if self.xhtml.findall('.//photos/.'):
@@ -692,7 +697,8 @@ class SaveFaceHTML(SaveFaceXML):
                                  encoding='unicode',
                                  method='html')
 
-        self.html = u'<html>' + \
+        self.html = u'<!doctype html>' + \
+                    '<html>' + \
                     '<head>' + \
                     '<link rel="shortcut icon" href="./favicon.ico">' + \
                     '<link rel="stylesheet"' + \

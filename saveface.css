@@ -104,11 +104,18 @@ table {
 	padding-right: 1vw;
 }
 
+.message {
+	line-height:  1.6;
+	padding-top: 2vh;
+	padding-bottom: 2vh;
+	padding-left: 5vh;
+	padding-right: 5vh;
+}
+
 .content .message {
 	display: flex;
 	flex-direction: row;
 	justify-content: flex-start;
-	padding: 10px;
 	border: solid 5px;
 	border-color: white;
 	background: skyblue;
