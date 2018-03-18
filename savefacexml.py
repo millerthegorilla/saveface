@@ -1,0 +1,224 @@
+from saveface import SaveFace
+
+from xml.etree import ElementTree as ET  # should have used lxml
+from dicttoxml import dicttoxml
+
+
+class SaveFaceXML(SaveFace):
+    def __init__(self):
+        super().__init__()
+        self.xml = ET.fromstring("<content></content>")
+        self.xmlposts = []
+
+    def get_pages_from_graph(self, graph=None, number_of_pages=None,
+                             request_string=None, verbose=True):
+        super().get_pages_from_graph(graph,
+                                     number_of_pages,
+                                     request_string,
+                                     verbose)
+        self.__format_()
+
+    def get_pages_from_pickle(self):
+        super().get_pages_from_pickle()
+        self.__format_()
+
+    def get_posts_from_pages(self):
+        super().get_posts_from_pages()
+        for p in self.posts:
+            self.xmlposts.append(ET.XML(dicttoxml(p, attr_type=False, custom_root='post')))
+
+    def __format_(self):
+        if len(self.pages):
+            for page in self.pages:
+                self.xml.append(ET.XML(dicttoxml(page, attr_type=False, custom_root='page')))
+
+    def write(self, filename, filepath, overwrite=True):
+        """
+            Writes data to file as xml
+        Args:
+            results (str): string to write
+            type (str): Either 'json' or 'xml'
+        """
+        super().write(filename, filepath, overwrite)
+        try:
+            with open(filename, 'wb') as output:
+                ET.ElementTree(self.xml).write(output,
+                                               encoding="UTF-8",
+                                               xml_declaration=True)
+        except IOError as e:
+            print(type(e))
+            print(e.args)
+            print(e)
+
+    def get_images(self):
+        """
+        gets the image urls from the received data
+        and calls private function download
+        Args:
+            results(dict : required): dict results returned from facebook api
+        Raises:
+            ValueError: Description
+        """
+        # test
+        for it in self.xml.iterfind('image'):
+            print(it)
+
+        elements = []
+        els = self.xml.findall('image')
+        for el in els:
+            elements.push(el.find('src')[0])
+        els = self.xml.findall('full_picture')
+        elements = elements + els
+        self.__download_(elements)
+
+    def embed_file_paths():
+        pass  # TODO
+
+    def __str__(self):
+        return ET.tostring(self.xml, encoding="unicode", method="xml")
+
+class SaveFaceXML(SaveFace):
+    def __init__(self):
+        super().__init__()
+        self.xml = ET.fromstring("<content></content>")
+        self.xmlposts = []
+
+    def get_pages_from_graph(self, graph=None, number_of_pages=None,
+                             request_string=None, verbose=True):
+        super().get_pages_from_graph(graph,
+                                     number_of_pages,
+                                     request_string,
+                                     verbose)
+        self.__format_()
+
+    def get_pages_from_pickle(self):
+        super().get_pages_from_pickle()
+        self.__format_()
+
+    def get_posts_from_pages(self):
+        super().get_posts_from_pages()
+        for p in self.posts:
+            self.xmlposts.append(ET.XML(dicttoxml(p, attr_type=False, custom_root='post')))
+
+    def __format_(self):
+        if len(self.pages):
+            for page in self.pages:
+                self.xml.append(ET.XML(dicttoxml(page, attr_type=False, custom_root='page')))
+
+    def write(self, filename, filepath, overwrite=True):
+        """
+            Writes data to file as xml
+        Args:
+            results (str): string to write
+            type (str): Either 'json' or 'xml'
+        """
+        super().write(filename, filepath, overwrite)
+        try:
+            with open(filename, 'wb') as output:
+                ET.ElementTree(self.xml).write(output,
+                                               encoding="UTF-8",
+                                               xml_declaration=True)
+        except IOError as e:
+            print(type(e))
+            print(e.args)
+            print(e)
+
+    def get_images(self):
+        """
+        gets the image urls from the received data
+        and calls private function download
+        Args:
+            results(dict : required): dict results returned from facebook api
+        Raises:
+            ValueError: Description
+        """
+        # test
+        for it in self.xml.iterfind('image'):
+            print(it)
+
+        elements = []
+        els = self.xml.findall('image')
+        for el in els:
+            elements.push(el.find('src')[0])
+        els = self.xml.findall('full_picture')
+        elements = elements + els
+        self.__download_(elements)
+
+    def embed_file_paths():
+        pass  # TODO
+
+    def __str__(self):
+        return ET.tostring(self.xml, encoding="unicode", method="xml")
+
+class SaveFaceXML(SaveFace):
+    def __init__(self):
+        super().__init__()
+        self.xml = ET.fromstring("<content></content>")
+        self.xmlposts = []
+
+    def get_pages_from_graph(self, graph=None, number_of_pages=None,
+                             request_string=None, verbose=True):
+        super().get_pages_from_graph(graph,
+                                     number_of_pages,
+                                     request_string,
+                                     verbose)
+        self.__format_()
+
+    def get_pages_from_pickle(self):
+        super().get_pages_from_pickle()
+        self.__format_()
+
+    def get_posts_from_pages(self):
+        super().get_posts_from_pages()
+        for p in self.posts:
+            self.xmlposts.append(ET.XML(dicttoxml(p, attr_type=False, custom_root='post')))
+
+    def __format_(self):
+        if len(self.pages):
+            for page in self.pages:
+                self.xml.append(ET.XML(dicttoxml(page, attr_type=False, custom_root='page')))
+
+    def write(self, filename, filepath, overwrite=True):
+        """
+            Writes data to file as xml
+        Args:
+            results (str): string to write
+            type (str): Either 'json' or 'xml'
+        """
+        super().write(filename, filepath, overwrite)
+        try:
+            with open(filename, 'wb') as output:
+                ET.ElementTree(self.xml).write(output,
+                                               encoding="UTF-8",
+                                               xml_declaration=True)
+        except IOError as e:
+            print(type(e))
+            print(e.args)
+            print(e)
+
+    def get_images(self):
+        """
+        gets the image urls from the received data
+        and calls private function download
+        Args:
+            results(dict : required): dict results returned from facebook api
+        Raises:
+            ValueError: Description
+        """
+        # test
+        for it in self.xml.iterfind('image'):
+            print(it)
+
+        elements = []
+        els = self.xml.findall('image')
+        for el in els:
+            elements.push(el.find('src')[0])
+        els = self.xml.findall('full_picture')
+        elements = elements + els
+        self.__download_(elements)
+
+    def embed_file_paths():
+        pass  # TODO
+
+    def __str__(self):
+        return ET.tostring(self.xml, encoding="unicode", method="xml")

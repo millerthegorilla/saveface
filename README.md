@@ -4,6 +4,9 @@
 ---
 
 <h1 id="saveface.py"><a href="http://saveface.py">saveface.py</a></h1>
+
+<p>This is a work in progress, the git version history has a working version two commits ago which I will use in the meantime</p>
+
 <p>python script to download facebook posts and comments etc using graph api through facepy</p>
 <p>usage: python <a href="http://saveface.py">saveface.py</a> [-h] [-g [Where to source the pages from]] -a<br>
 [facebook auth token] [-r [rest api request string]]<br>

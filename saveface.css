@@ -162,6 +162,7 @@ table {
 .content .comments .item {
 	display: flex;
 	flex-direction: column;
+	flex-grow: 1;
 	background-color: #253DCC;
 	align-content: flex-start;
 	border: solid 1px;
