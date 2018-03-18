@@ -509,4 +509,503 @@ class SaveFace(SaveFaceABC):
         return string
 
     def __repr__(self):
+<<<<<<< master
         return "<%s()>" % (self.__class__.__name__)
+=======
+        return "<%s()>" % (self.__class__.__name__)
+
+
+class SaveFaceXML(SaveFace):
+    def __init__(self):
+        super().__init__()
+        self.xml = ET.fromstring("<content></content>")
+        self.xmlposts = []
+
+    def get_pages_from_graph(self, graph=None, number_of_pages=None,
+                             request_string=None, verbose=True):
+        super().get_pages_from_graph(graph,
+                                     number_of_pages,
+                                     request_string,
+                                     verbose)
+        self.__format_()
+
+    def get_pages_from_pickle(self):
+        super().get_pages_from_pickle()
+        self.__format_()
+
+    def get_posts_from_pages(self):
+        super().get_posts_from_pages()
+        for p in self.posts:
+            self.xmlposts.append(ET.XML(dicttoxml(p, attr_type=False, custom_root='post')))
+
+    def __format_(self):
+        if len(self.pages):
+            for page in self.pages:
+                self.xml.append(ET.XML(dicttoxml(page, attr_type=False, custom_root='page')))
+
+    def write(self, filename, filepath, overwrite=True):
+        """
+            Writes data to file as xml
+        Args:
+            results (str): string to write
+            type (str): Either 'json' or 'xml'
+        """
+        super().write(filename, filepath, overwrite)
+        try:
+            with open(filename, 'wb') as output:
+                ET.ElementTree(self.xml).write(output,
+                                               encoding="UTF-8",
+                                               xml_declaration=True)
+        except IOError as e:
+            print(type(e))
+            print(e.args)
+            print(e)
+
+    def get_images(self):
+        """
+        gets the image urls from the received data
+        and calls private function download
+        Args:
+            results(dict : required): dict results returned from facebook api
+        Raises:
+            ValueError: Description
+        """
+        # test
+        for it in self.xml.iterfind('image'):
+            print(it)
+
+        elements = []
+        els = self.xml.findall('image')
+        for el in els:
+            elements.push(el.find('src')[0])
+        els = self.xml.findall('full_picture')
+        elements = elements + els
+        self.__download_(elements)
+
+    def embed_file_paths():
+        pass  # TODO
+
+    def __str__(self):
+        return ET.tostring(self.xml, encoding="unicode", method="xml")
+
+
+class SaveFaceHTML(SaveFaceXML):
+
+    def __init__(self):
+        super().__init__()
+        self.html = ''
+
+    def get_pages_from_graph(self, graph=None, number_of_pages=None,
+                             request_string=None, verbose=True):
+        super().get_pages_from_graph(graph,
+                                     number_of_pages,
+                                     request_string,
+                                     verbose)
+        self.__format_()
+
+    def get_pages_from_pickle(self):
+        super().get_pages_from_pickle()
+        self.__format_()
+
+    def __format_(self, cssfile='saveface.css'):
+        self.xhtml = ET.fromstring("<content></content>")
+        super().get_posts_from_pages()
+
+        # convert xmlposts to xhtml
+        if len(self.xmlposts):
+            for p in self.xmlposts:
+                self.xhtml.append(p)
+                m = p.find('./message')
+                if m is not None:
+                    m.text = m.text.replace('\n', u'<br>')
+
+        # format xhtml
+        if self.xhtml.findall('.//headers') is not None:
+            p = self.xhtml.findall('.//headers/..')
+            for e in p:
+                e.remove(e.find('./headers'))
+
+        if self.xhtml.findall('.//paging') is not None:
+            p = self.xhtml.findall('.//paging/..')
+            for e in p:
+                e.remove(e.find('./paging'))
+
+        for i in self.xhtml.findall('.//attachment/.'):
+            if i.find('./media') is not None:
+                i.remove(i.find('./media'))
+            j = i.find('url')
+            if j is not None and j.text is not None:
+                if i.find('./title') is not None:
+                    title = i.find('./title').text
+                else:
+                    title = "iframe"
+                e = ET.Element('iframe', attrib={'src': j.text,
+                                                 'title': title,
+                                                 'class': 'iframe',
+                                                 'sandbox': ''})
+
+                e.text = "iframe  :  " + j.text
+                i.remove(j)
+                i.append(e)
+                if i.find('./target') is not None:
+                    i.remove(i.find('./target'))
+            else:
+                j = i.find('target')
+                if j is not None and j.text is not None:
+                    if i.find('./title') is not None:
+                        title = i.find('./title').text
+                    else:
+                        title = "iframe"
+                    e = ET.Element('iframe', attrib={'src': j.text,
+                                                     'title': title,
+                                                     'class': iframe,
+                                                     'sandbox': ''})
+                    e.text = "iframe  :  " + j.text
+                    i.remove(j)
+                    i.append(e)
+                    if i.find('./url') is not None:
+                        title = i.find('./url')
+                    else:
+                        title = "iframe"
+
+        for i in self.xhtml.findall('.//posts/.'):
+            e = ET.Element('p', attrib={'class': 'posts-title'})
+            e.text = '<strong>Posts</strong>'
+            i.insert(0, e)
+
+        for i in self.xhtml.findall('.//comments/.'):
+            e = ET.Element('p', attrib={'class': 'comments-title'})
+            e.text = '<strong>Comments</strong>'
+            i.insert(0, e)
+
+        if self.xhtml.findall('.//photos/.'):
+            for i in self.xhtml.findall('.//picture/..'):
+                pid = i.find('./id')
+                if pid.text is not None:
+                    a = ET.Element('a',
+                                   attrib={'class': 'photo-link',
+                                           'href': 'https://www.facebook.com/photo.php?fbid=' +
+                                           pid.text,
+                                           'name': pid.text})
+                    a.text = 'picture id : ' + pid.text
+                    pid.insert(0, a)
+                    pid.text = None
+                    pid.tag = 'photo-id'
+            for i in self.xhtml.findall('.//photos/data/item'):
+                i.tag = 'photo'
+
+        for i in self.xhtml.findall('.//item/id/.'):
+            e = ET.Element('p', attrib={'class': 'comment-id'})
+            e.text = 'comment id : ' + i.text
+            i.append(e)
+            i.text = None
+
+        for i in self.xhtml.findall('.//post/id/.'):
+            e = ET.Element('p', attrib={'class': 'post-id'})
+            e.text = 'post id : ' + i.text
+            i.append(e)
+            i.text = None
+
+        p = self.xhtml.findall('.//picture')
+        fp = self.xhtml.findall('.//full_picture')
+        fpp = p + fp
+        for el in fpp:
+            el.insert(0, ET.Element('img', attrib={'class': 'image',
+                                                   'src': el.text}))
+            el.text = None
+
+        for el in self.xhtml.findall('.//created_time'):
+            el.tag = 'a'
+            el.attrib = {'class': 'created_time', 'name': el.text}
+
+        for el in self.xhtml.iter():
+            if el.tag not in ['img', 'p', 'a']:
+                el.attrib = {'class': el.tag, **el.attrib}
+                el.tag = 'div'
+
+        self.xhtml.tag = 'content'
+        htmlstring = ET.tostring(self.xhtml,
+                                 encoding='unicode',
+                                 method='html')
+
+        self.html = u'<!doctype html>' + \
+                    '<html>' + \
+                    '<head>' + \
+                    '<link rel="shortcut icon" href="./favicon.ico">' + \
+                    '<link rel="stylesheet"' + \
+                    'href="' + cssfile + '">' + \
+                    '<title>SaveFacePie</title>' + \
+                    '</head><body>' + \
+                    htmlstring + \
+                    '</body></html>'
+
+    def htmlwrap(element_list, wrapper_element, tags):
+        for element in element_list:
+            wrap_element = ET.Element(wrapper_element.tag,
+                                      wrapper_element.attrib)
+            for el in list(element):
+                if el.tag in tags:
+                    element.remove(el)
+                    wrap_element.append(el)
+            element.append(wrap_element)
+
+    # todo - add xml_declaration
+    def write(self, filename, filepath, method='html', overwrite=True):
+        """
+            Writes data to file as xml
+        Args:
+            filename (str): name of file
+            filepath (str): path to file
+            overwrite(bool): whether to overwrite file
+        """
+        # super().write(filename, filepath, 'html', overwrite)
+        with open(filepath + filename, 'w') as output:
+            output.write(bs(self.html, "html.parser").prettify(formatter=None))
+
+    def __str__(self):
+        return bs(self.html, "html.parser").prettify(formatter=None)
+
+
+class SaveFaceJSON(SaveFace):
+
+    def __init__(self, ispretty=False, indent=4, width=80, depth=None):
+        super().__init__()
+        self.json = {}
+        self._indent = indent
+        self._width = width
+        self._depth = None
+        self._ispretty = ispretty
+
+    def get_pages_from_graph(self,
+                             graph=None,
+                             number_of_pages=None,
+                             request_string=None,
+                             verbose=True):
+        super().get_pages_from_graph(graph,
+                                     number_of_pages,
+                                     request_string,
+                                     verbose)
+        page_string = ''
+        if len(self.pages):
+            for page in self.pages:
+                page_string = page_string + str(page)
+        self.json = json.loads(json.dumps(page_string))
+
+    def write(self, filename, filepath, overwrite=True):
+        super().write(filename, filepath, overwrite)
+        try:
+            with open(filename, 'w') as output:
+                if self._ispretty:
+                    json.dump(pprint(indent=self._indent,
+                                     width=self._width,
+                                     depth=self._depth), output)
+                else:
+                    json.dump(self.json, output)
+        except IOError as e:
+            print(type(e))
+            print(e.args)
+            print(e)
+
+    def prprint(self, indent=None, width=None, depth=None):
+        """prettyprints the results string
+        Args:
+            indent: int
+            width: int
+            depth: int    values for pprint
+        Returns:
+            str: pretty printed string representation
+        """
+        if indent is not None:
+            indent = self._indent
+        if width is not None:
+            width = self._width
+        if depth is not None:
+            depth = self._depth
+
+        if self.json is None:
+            raise ValueError("Json object can not be none.  Get Page/s first")
+        else:
+            return pprint.pformat(self.json, indent=indent | self._indent,
+                                  width=self._width, depth=self._depth)
+
+    def __str__(self):
+        if self._ispretty:
+            return pprint()
+        else:
+            return json.dumps(self.json)
+
+
+def process_args(args):
+    """
+    Internal function used by script when standalone
+    Args:
+        args (dict): args from argparser
+    No Longer Raises:
+        ValueError: if O_Auth_tkn is not set
+    """
+    sf = None
+    if args.format == 'xml':
+        sf = SaveFaceXML()
+    elif args.format == 'json':
+        sf = SaveFaceJSON()
+    elif args.format == 'pjson':
+        __prepare_pprint_()
+        sf = SaveFaceJSON(ispretty=True,
+                          indent=args.pprint_opts['indent'],
+                          width=args.pprint_opts['width'],
+                          depth=args.pprint_opts['depth'])
+    elif args.format == 'html':
+        sf = SaveFaceHTML()
+
+    if args.source == 'facebook':
+        sf.init_graph(args.O_Auth_tkn)
+        sf.get_pages_from_graph(request_string=args.request_string)
+    elif args.source == 'pickle':
+        sf.get_pages_from_pickle()
+
+    if args.pickle:
+        sf.save_pages_to_pickle()
+    # if args.images:
+    #     sf.get_images() args.img_folder
+
+    if args.stdout:
+        print(str(sf))
+    if args.filename is not None:
+        sf.write(args.filename, args.filepath)
+
+    # images
+    # if self.args.images == True:
+        # self.sf.get_images(result)
+        # exchange the text in the url nodes from the node list
+        # with local filepaths
+        # TODO
+
+
+def __prepare_pprint_(args):
+    """
+    prepares the pprint options string from the args
+    Raises:
+        ValueError: Description
+    """
+    SUPPORTED_TYPES = ['indent', 'width', 'depth']
+    for a in args.pprint_opts:
+        b = a.split('=')
+        if b[0] not in SUPPORTED_TYPES:
+            raise ValueError('Unsupported type "%s". Supported types are %s'
+                             % (b[0], ', '.join(SUPPORTED_TYPES)))
+        if b[1] != 'None':
+            args.pprint_opts[b[0]] = int(b[1])
+        else:
+            args.pprint_opts[b[0]] = None
+
+    if args.pprint_opts['indent'] is None:
+        args.pprint_opts['indent'] = 4
+    if args.pprint_opts['width'] is None:
+        args.pprint_opts['width'] = 80
+    if args.pprint_opts['depth'] is None:
+        args.pprint_opts['depth'] = 20
+
+
+if __name__ == "__main__":
+    # me?fields=id,name,posts.include_hidden(true){created_time,from,message,comments{created_time,from,message,comments{created_time,from,message},attachment},full_picture}
+    defaultqstring = 'me?fields=posts.include_hidden(true) \
+                     {created_time,from,message,comments \
+                     {created_time,from,message,comments \
+                     {created_time,from,message},attachment},full_picture}'
+    parser = argparse.ArgumentParser(epilog="Saving Face with saveface.py",
+                                     description="Download your facebook posts, \
+                                                  comments,images etc.\n\
+                                                  Default request \
+                                                  string is :\n\
+                                                  " + defaultqstring)
+    parser.add_argument('-g', '--getfrom',
+                        metavar='Where to source the pages from',
+                        type=str, required=False, nargs='?',
+                        default='facebook',
+                        help='Optional. Can be one of facebook or pickle.\n\
+                              Defaults to facebook\n',
+                        choices=['facebook', 'pickle'],
+                        dest='source')
+    parser.add_argument('-a', '--auth_tkn',
+                        metavar='facebook auth token',
+                        type=str, required=False, nargs='?',
+                        help='Optional. Your app\'s facebook \
+                              authorisation token. Must be set \
+                              to retrieve from facebook (see -g)',
+                        dest='O_Auth_tkn')
+    parser.add_argument('-r', '--request_string',
+                        metavar='rest api request string',
+                        type=str, required=False, nargs='?',
+                        default=defaultqstring,
+                        help='Optional. The request string \
+                              to query facebook\'s api. \
+                              Default request string above',
+                        dest='request_string')
+    parser.add_argument('-f', '--format',
+                        metavar='output format for results',
+                        type=str, required=False, nargs='?',
+                        default='json', help='Optional. \
+                                              Can be one of json, \
+                                              pjson (prettyprinted), \
+                                              xml or html. \
+                                              Defaults to json',
+                        choices=['json', 'pjson', 'xml', 'html'],
+                        dest='format')
+    parser.add_argument('-o', '--stdout',
+                        metavar='output to stdout',
+                        type=bool, required=False, nargs='?',
+                        default=False, help='Optional. Output to stdout. \
+                                             Defaults to False',
+                        dest='stdout')
+    parser.add_argument('-s', '--save',
+                        metavar='pickle the array of pages',
+                        type=bool, required=False, nargs='?',
+                        default=False, help='Optional. Use Pickle to store the array of pages. \
+                                             Defaults to False',
+                        dest='pickle')
+    parser.add_argument('-n', '--filename',
+                        metavar='filename for the output',
+                        type=str, required=False, nargs='?',
+                        default=None, help='Optional. A filename for \
+                                            the results. Results will \
+                                            not be saved without \
+                                            filename being specified',
+                        dest="filename")
+    parser.add_argument('-l', '--location',
+                        metavar='filepath for the output',
+                        type=str, required=False, nargs='?',
+                        default='./', help='Optional. A filepath \
+                                            for the results file. \
+                                            Defaults to ./',
+                        dest='filepath')
+    parser.add_argument('-p', '--pprint_options',
+                        metavar='pprint options',
+                        type=str, required=False, nargs='*',
+                        default='[indent=4, width=80, depth=None]',
+                        help="Optional. Options for pprint module.\n\
+                              key=value with comma ie -p [indent=4, depth=80]",
+                        dest='pprint_opts')
+    parser.add_argument('-i', '--images',
+                        metavar='download images?',
+                        type=bool, required=False, nargs='?',
+                        default=False, help='Optional.  A boolean to indicate \
+                                             whether or not to download \
+                                             images. Defaults to False',
+                        dest='images')
+    parser.add_argument('-d', '--image_path',
+                        metavar='path to images',
+                        type=str, required=False, nargs='?',
+                        default='images', help='Optional. The path to the \
+                                                images folder.\
+                                                Defaults to ./images',
+                        dest='img_folder')
+    parser.add_argument('-c', '--css',
+                        metavar='css filename',
+                        type=str, required=False, nargs='?',
+                        default='saveface.css', help='Optional. The filename of the \
+                                                css file.\
+                                                Defaults to saveface.css',
+                        dest='cssfile')
+
+    process_args(parser.parse_args())
+>>>>>>> created branch and repaired - editing iframes
