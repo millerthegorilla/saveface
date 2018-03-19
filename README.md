@@ -5,7 +5,7 @@
 
 <h1 id="saveface.py"><a href="http://saveface.py">saveface.py</a></h1>
 
-<p>This is a work in progress, the git version history has a working version two commits ago which I will use in the meantime</p>
+<p>This is a work in progress, the git version history has a working version on the branch 'working2' which I will use in the meantime.  I'll sort this out later today.</p>
 
 <p>python script to download facebook posts and comments etc using graph api through facepy</p>
 <p>usage: python <a href="http://saveface.py">saveface.py</a> [-h] [-g [Where to source the pages from]] -a<br>
@@ -57,5 +57,5 @@ the xml file by relative file paths to the local copies.</p>
 eyJoaXN0b3J5IjpbMjAxMDI3NTQ3Ml19
 -->
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbODExNjI2NTc4XX0=
+eyJoaXN0b3J5IjpbMTk4ODI3NTU0MV19
 -->
