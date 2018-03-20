@@ -30,6 +30,7 @@ import threading
 import requests
 import re
 import pickle
+import dpath.util
 
 from boundinnerclasses import BoundInnerClass
 from facepy import GraphAPI
@@ -131,9 +132,8 @@ class SaveFace(SaveFaceABC):
         self.filename = ""
         self.filepath = ""
         self.pages = []  # the result dictionary
-        self.posts = []
-        self.post_classes = []  # the post class objects
-        self.args = {}  # the args from command line input
+        self.data = []
+        self.data_classes = []  # the data class objects
 
     def __download_(self, elements, numthreads=4):
         """
@@ -264,13 +264,8 @@ class SaveFace(SaveFaceABC):
         super().init_graph(O_Auth_tkn)
 
         if O_Auth_tkn is not None:
-            auth = O_Auth_tkn
-        else:
-            auth = self.args.O_Auth_tkn
-
-        if auth is not None:
             try:
-                graph = GraphAPI(auth)
+                graph = GraphAPI(O_Auth_tkn)
             except (fpexceptions.OAuthError, fpexceptions.HTTPError) as e:
                 print(type(e))
                 print(e.args)
@@ -332,7 +327,7 @@ class SaveFace(SaveFaceABC):
         """
         Populates a list of dicts representing pages of stored
                     in an array from facebook
-        I wasn't able to get the facepy iterator working, and it 
+        I wasn't able to get the facepy iterator working, and it
         may be my knowledge of python rather than the code on github
         so I will look more at it when I have time.  The code on github
         returned a generator but it cleaned the request dictionary
@@ -366,7 +361,6 @@ class SaveFace(SaveFaceABC):
         pages = []
         found = False
         pages.append(self.get_page_from_graph(request_string))
-
         try:
             while True:
                 for np in self.dict_extract('next', pages[-1]):
@@ -402,22 +396,41 @@ class SaveFace(SaveFaceABC):
     def __format_(self):
         pass
 
-    def get_posts_from_pages(self):
-        if self.pages is not None:
-            if 'posts' in self.pages[0]:
-                if 'data' in self.pages[0]['posts']:
-                    self.posts = self.pages[0]['posts']['data']
-                    for i in self.pages[1:]:
-                        self.posts = self.posts + i['data']
-                    for i in self.posts:
-                        if 'comments' in i:
-                            i['comments'] = i['comments']['data']
-                            for j in i['comments']:
-                                if 'comments' in j:
-                                    j['comments'] = j['comments']['data']
-        return self.posts
+    def get_data_from_pages(self):
+        self.get_top_data_from_pages(self.pages)
 
-    def get_posts_as_classes(self):
+    def get_top_data_from_pages(self, pages):
+        for page in pages:
+            if type(page) is dict:
+                for k, v in page.items():
+                    if 'data' in k:
+                        for d in page['data']:
+                            self.data.append(d)
+                            break
+                    if 'data' in v:
+                            for d in v['data']:
+                                self.data.append(d)
+                                break
+                    else:
+                        self.get_top_data_from_pages(page.items())
+
+# see this string - me?fields=id,name,photos
+
+        # if self.pages is not None:
+        #     if 'posts' in self.pages[0]:
+        #         if 'data' in self.pages[0]['posts']:
+        #             self.data = self.pages[0]['posts']['data']
+        #             for i in self.pages[1:]:
+        #                 self.data = self.data + i['data']
+        #             for i in self.data:
+        #                 if 'comments' in i:
+        #                     i['comments'] = i['comments']['data']
+        #                     for j in i['comments']:
+        #                         if 'comments' in j:
+        #                             j['comments'] = j['comments']['data']
+        return self.data
+
+    def get_data_as_classes(self):
 
         class Post:
             @classmethod
@@ -426,14 +439,14 @@ class SaveFace(SaveFaceABC):
                 obj.__dict__.update(dict)
                 return obj
 
-        if len(self.posts):
-            for i in self.posts:
-                self.post_classes.append
+        if len(self.data):
+            for i in self.data:
+                self.data_classes.append
                 (json.loads(json.dumps(i), object_hook=Post.from_dict))
         else:
             raise ValueError("posts list is empty. \
-                             Call get_posts_from_pages first!")
-        return self.post_classes
+                             Call get_data_from_pages first!")
+        return self.data_classes
 
     # pickle the pages array
     def save_pages_to_pickle(self):

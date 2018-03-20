@@ -18,7 +18,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
 from savefacexml import SaveFaceXML
 from bs4 import BeautifulSoup as bs
 
@@ -31,55 +30,28 @@ class SaveFaceHTML(SaveFaceXML):
 
     def get_pages_from_pickle(self):
         super().get_pages_from_pickle()
-        self.__format_()
         return self.pages
 
-    def get_posts_from_graph(self, graph=None, number_of_pages=None,
-                             request_string=None, verbose=True):
+    def get_data_from_graph(self, graph=None, number_of_pages=None,
+                            request_string=None, verbose=True):
         super().get_pages_from_graph(graph=graph,
                                      number_of_pages=number_of_pages,
                                      request_string=request_string,
                                      verbose=verbose)
-        self.get_posts_from_pages()
-        return self.posts
+        return self.data
 
-    def get_posts_from_pages(self):
-        super().get_posts_from_pages()
-        self.__format_()
-        return self.posts
+    def get_data_from_pages(self):
+        super().get_data_from_pages()
+        return self.data
 
-    def get_posts_from_pickle(self):
+    def get_data_from_pickle(self):
         self.get_pages_from_pickle()
-        self.get_posts_from_pages()
-        return self.posts
+        self.get_data_from_pages()
+        return self.data
 
-    def get_html(self, cssfile='saveface.css'):
-
-        self.xhtml.tag = 'content'
-        htmlstring = ET.tostring(self.xhtml,
-                                 encoding='unicode',
-                                 method='html')
-
-        self.html = u'<!doctype html>' + \
-                    '<html>' + \
-                    '<head>' + \
-                    '<link rel="shortcut icon" href="./favicon.ico">' + \
-                    '<link rel="stylesheet"' + \
-                    'href="' + cssfile + '">' + \
-                    '<title>SaveFacePie</title>' + \
-                    '</head><body>' + \
-                    htmlstring + \
-                    '</body></html>'
-
-    def htmlwrap(element_list, wrapper_element, tags):
-        for element in element_list:
-            wrap_element = ET.Element(wrapper_element.tag,
-                                      wrapper_element.attrib)
-            for el in list(element):
-                if el.tag in tags:
-                    element.remove(el)
-                    wrap_element.append(el)
-            element.append(wrap_element)
+    def init_html(self, formatter):
+        formatter.format(self.xmlposts)
+        self.html = formatter.html
 
     # todo - add xml_declaration
     def write(self, filename, filepath, overwrite=True):

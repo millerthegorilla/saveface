@@ -18,10 +18,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
+import sys
 from savefacexml import SaveFaceXML
 from savefacehtml import SaveFaceHTML
 from savefacejson import SaveFaceJSON
+from savefaceformatter import SaveFaceFormatterHTML as sfformat
 
 import argparse
 # below needs to be overloaded to do anything useful
@@ -52,12 +53,13 @@ def process_args(args):
 
     if args.source == 'facebook':
         sf.init_graph(args.O_Auth_tkn)
-        sf.get_posts_from_graph(request_string=args.request_string)
+        sf.get_pages_from_graph(request_string=args.request_string)
     elif args.source == 'pickle':
         sf.get_pages_from_pickle()
 
     if args.format == 'html':
-        sf.get_posts_from_pages()
+        sf.get_data_from_pages()
+        sf.init_html(sfformat())
     if args.pickle:
         sf.save_pages_to_pickle()
     # if args.images:
@@ -74,6 +76,7 @@ def process_args(args):
         # exchange the text in the url nodes from the node list
         # with local filepaths
         # TODO
+
 
 def __prepare_pprint_(args):
     """
@@ -200,5 +203,10 @@ if __name__ == "__main__":
                                                 css file.\
                                                 Defaults to saveface.css',
                         dest='cssfile')
+
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        print('\nYou need to supply some arguments...\n')
+        sys.exit(1)
 
     process_args(parser.parse_args())
