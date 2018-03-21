@@ -18,7 +18,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
 from xml.etree import ElementTree as ET  # should have used lxml
 from abc import ABC, abstractmethod
 
@@ -76,13 +75,14 @@ default_html_template = u'<!doctype html>' + \
                         '</body></html>'
 
 
+# need to subclass this file and put the
+
 # this can be subclassed for different request strings
 class SaveFaceFormatterHTML(SaveFaceFormatterABC):
     def __init__(self):
         super().__init__()
-        self._xhtml = None
+        self.xhtml = ET.fromstring("<content></content>")
         self._template = default_html_template
-        self._html = ''
 
     @property
     def template(self):
@@ -94,31 +94,38 @@ class SaveFaceFormatterHTML(SaveFaceFormatterABC):
 
     @property
     def html(self):
-        return self._html
+        return self.template.format(ET.tostring(self.xhtml,
+                                                encoding='unicode',
+                                                method='html'))
 
-    def format(self, xml):
-        super().format(xml)
-        self._xhtml = ET.fromstring("<content></content>")
-        # convert xml to _xhtml
-        if len(xml):
-            for p in xml:
-                self._xhtml.append(p)
+    def format(self, xmlitems, xmlfunction=None):
+        super().format(xmlitems)
+        if len(xmlitems):
+            for p in xmlitems:
+                self.xhtml.append(p)
                 m = p.find('./message')
-                if m is not None:
+                if m is not None and m.text is not None:
                     m.text = m.text.replace('\n', u'<br>')
 
-        # format _xhtml
-        if self._xhtml.findall('.//headers') is not None:
-            p = self._xhtml.findall('.//headers/..')
+        if xmlfunction is not None:
+            self.xhtml = xmlfunction(self.xhtml)
+
+
+def htmlformat(xmlitems):
+          # format _xhtml
+        print('hello')
+        print(xmlitems)
+        if xmlitems.findall('.//headers') is not None:
+            p = xmlitems.findall('.//headers/..')
             for e in p:
                 e.remove(e.find('./headers'))
 
-        if self._xhtml.findall('.//paging') is not None:
-            p = self._xhtml.findall('.//paging/..')
+        if xmlitems.findall('.//paging') is not None:
+            p = xmlitems.findall('.//paging/..')
             for e in p:
                 e.remove(e.find('./paging'))
 
-        for i in self._xhtml.findall('.//attachment/.'):
+        for i in xmlitems.findall('.//attachment/.'):
             if i.find('./media') is not None:
                 i.remove(i.find('./media'))
             j = i.find('url')
@@ -131,7 +138,6 @@ class SaveFaceFormatterHTML(SaveFaceFormatterABC):
                                                  'title': title,
                                                  'class': 'iframe',
                                                  'sandbox': ''})
-
                 e.text = "iframe  :  " + j.text
                 i.remove(j)
                 i.append(e)
@@ -156,18 +162,18 @@ class SaveFaceFormatterHTML(SaveFaceFormatterABC):
                     else:
                         title = "iframe"
 
-        for i in self._xhtml.findall('.//posts/.'):
+        for i in xmlitems.findall('.//posts/.'):
             e = ET.Element('p', attrib={'class': 'posts-title'})
             e.text = '<strong>Posts</strong>'
             i.insert(0, e)
 
-        for i in self._xhtml.findall('.//comments/.'):
+        for i in xmlitems.findall('.//comments/.'):
             e = ET.Element('p', attrib={'class': 'comments-title'})
             e.text = '<strong>Comments</strong>'
             i.insert(0, e)
 
-        if self._xhtml.findall('.//photos/.'):
-            for i in self._xhtml.findall('.//picture/..'):
+        if xmlitems.findall('.//photos/.'):
+            for i in xmlitems.findall('.//picture/..'):
                 pid = i.find('./id')
                 if pid.text is not None:
                     a = ET.Element('a',
@@ -179,41 +185,36 @@ class SaveFaceFormatterHTML(SaveFaceFormatterABC):
                     pid.insert(0, a)
                     pid.text = None
                     pid.tag = 'photo-id'
-            for i in self._xhtml.findall('.//photos/data/item'):
+            for i in xmlitems.findall('.//photos/data/item'):
                 i.tag = 'photo'
 
-        for i in self._xhtml.findall('.//item/id/.'):
+        for i in xmlitems.findall('.//item/id/.'):
             e = ET.Element('p', attrib={'class': 'comment-id'})
             e.text = 'comment id : ' + i.text
             i.append(e)
             i.text = None
 
-        for i in self._xhtml.findall('.//post/id/.'):
+        for i in xmlitems.findall('.//post/id/.'):
             e = ET.Element('p', attrib={'class': 'post-id'})
             e.text = 'post id : ' + i.text
             i.append(e)
             i.text = None
 
-        p = self._xhtml.findall('.//picture')
-        fp = self._xhtml.findall('.//full_picture')
+        p = xmlitems.findall('.//picture')
+        fp = xmlitems.findall('.//full_picture')
         fpp = p + fp
         for el in fpp:
             el.insert(0, ET.Element('img', attrib={'class': 'image',
                                                    'src': el.text}))
             el.text = None
 
-        for el in self._xhtml.findall('.//created_time'):
+        for el in xmlitems.findall('.//created_time'):
             el.tag = 'a'
             el.attrib = {'class': 'created_time', 'name': el.text}
 
-        for el in self._xhtml.iter():
+        for el in xmlitems.iter():
             if el.tag not in ['img', 'p', 'a']:
                 el.attrib = {'class': el.tag, **el.attrib}
                 el.tag = 'div'
 
-        self._xhtml.tag = 'content'
-        htmlstring = ET.tostring(self._xhtml,
-                                 encoding='unicode',
-                                 method='html')
-
-        self._html = self.template.format(htmlstring)
+        return xmlitems

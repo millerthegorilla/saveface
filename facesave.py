@@ -23,7 +23,7 @@ from savefacexml import SaveFaceXML
 from savefacehtml import SaveFaceHTML
 from savefacejson import SaveFaceJSON
 from savefaceformatter import SaveFaceFormatterHTML as sfformat
-
+from savefaceformatter import htmlformat
 import argparse
 # below needs to be overloaded to do anything useful
 # from argparse import RawTextHelpFormatter
@@ -59,7 +59,8 @@ def process_args(args):
 
     if args.format == 'html':
         sf.get_data_from_pages()
-        sf.init_html(sfformat())
+        sfmt = sfformat()
+        sf.init_html(sfmt, htmlformat)
     if args.pickle:
         sf.save_pages_to_pickle()
     # if args.images:
@@ -210,3 +211,109 @@ if __name__ == "__main__":
         sys.exit(1)
 
     process_args(parser.parse_args())
+
+
+def htmlformat(xmlitems):
+    if xmlitems.findall('.//headers') is not None:
+        p = xmlitems.findall('.//headers/..')
+        for e in p:
+            e.remove(e.find('./headers'))
+
+    if xmlitems.findall('.//paging') is not None:
+        p = xmlitems.findall('.//paging/..')
+        for e in p:
+            e.remove(e.find('./paging'))
+
+    for i in xmlitems.findall('.//attachment/.'):
+        if i.find('./media') is not None:
+            i.remove(i.find('./media'))
+        j = i.find('url')
+        if j is not None and j.text is not None:
+            if i.find('./title') is not None:
+                title = i.find('./title').text
+            else:
+                title = "iframe"
+            e = ET.Element('iframe', attrib={'src': j.text,
+                                             'title': title,
+                                             'class': 'iframe',
+                                             'sandbox': ''})
+            e.text = "iframe  :  " + j.text
+            i.remove(j)
+            i.append(e)
+            if i.find('./target') is not None:
+                i.remove(i.find('./target'))
+        else:
+            j = i.find('target')
+            if j is not None and j.text is not None:
+                if i.find('./title') is not None:
+                    title = i.find('./title').text
+                else:
+                    title = "iframe"
+                e = ET.Element('iframe', attrib={'src': j.text,
+                                                 'title': title,
+                                                 'class': iframe,
+                                                 'sandbox': ''})
+                e.text = "iframe  :  " + j.text
+                i.remove(j)
+                i.append(e)
+                if i.find('./url') is not None:
+                    title = i.find('./url')
+                else:
+                    title = "iframe"
+
+    for i in xmlitems.findall('.//posts/.'):
+        e = ET.Element('p', attrib={'class': 'posts-title'})
+        e.text = '<strong>Posts</strong>'
+        i.insert(0, e)
+
+    for i in xmlitems.findall('.//comments/.'):
+        e = ET.Element('p', attrib={'class': 'comments-title'})
+        e.text = '<strong>Comments</strong>'
+        i.insert(0, e)
+
+    if xmlitems.findall('.//photos/.'):
+        for i in xmlitems.findall('.//picture/..'):
+            pid = i.find('./id')
+            if pid.text is not None:
+                a = ET.Element('a',
+                               attrib={'class': 'photo-link',
+                                       'href': 'https://www.facebook.com/photo.php?fbid=' +
+                                       pid.text,
+                                       'name': pid.text})
+                a.text = 'picture id : ' + pid.text
+                pid.insert(0, a)
+                pid.text = None
+                pid.tag = 'photo-id'
+        for i in xmlitems.findall('.//photos/data/item'):
+            i.tag = 'photo'
+
+    for i in xmlitems.findall('.//item/id/.'):
+        e = ET.Element('p', attrib={'class': 'comment-id'})
+        e.text = 'comment id : ' + i.text
+        i.append(e)
+        i.text = None
+
+    for i in xmlitems.findall('.//post/id/.'):
+        e = ET.Element('p', attrib={'class': 'post-id'})
+        e.text = 'post id : ' + i.text
+        i.append(e)
+        i.text = None
+
+    p = xmlitems.findall('.//picture')
+    fp = xmlitems.findall('.//full_picture')
+    fpp = p + fp
+    for el in fpp:
+        el.insert(0, ET.Element('img', attrib={'class': 'image',
+                                               'src': el.text}))
+        el.text = None
+
+    for el in xmlitems.findall('.//created_time'):
+        el.tag = 'a'
+        el.attrib = {'class': 'created_time', 'name': el.text}
+
+    for el in xmlitems.iter():
+        if el.tag not in ['img', 'p', 'a']:
+            el.attrib = {'class': el.tag, **el.attrib}
+            el.tag = 'div'
+
+    return xmlitems

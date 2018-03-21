@@ -49,8 +49,8 @@ class SaveFaceHTML(SaveFaceXML):
         self.get_data_from_pages()
         return self.data
 
-    def init_html(self, formatter):
-        formatter.format(self.xmlposts)
+    def init_html(self, formatter, function):
+        formatter.format(self.xmlposts, function)
         self.html = formatter.html
 
     # todo - add xml_declaration

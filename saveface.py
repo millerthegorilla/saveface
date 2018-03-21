@@ -390,30 +390,40 @@ class SaveFace(SaveFaceABC):
             print('received {} pages            '.format(num_pages), end='\r')
         self._num_pages = num_pages
         self.pages = pages[:-1]
-        self.__format_()
         return pages
 
-    def __format_(self):
-        pass
-
     def get_data_from_pages(self):
-        self.get_top_data_from_pages(self.pages)
+        for page in self.pages:
+            for i in self.dict_extract('data', page):
+                self.data = self.data + i
+        for i in self.data:
+            if 'comments' in i:
+                if 'data' in i['comments']:
+                    i['comments'] = i['comments']['data']
+                for j in i['comments']:
+                    if 'comments' in j:
+                        j['comments'] = j['comments']['data']
 
     def get_top_data_from_pages(self, pages):
-        for page in pages:
-            if type(page) is dict:
-                for k, v in page.items():
-                    if 'data' in k:
-                        for d in page['data']:
-                            self.data.append(d)
-                            break
-                    if 'data' in v:
-                            for d in v['data']:
-                                self.data.append(d)
-                                break
-                    else:
-                        self.get_top_data_from_pages(page.items())
-
+        # for page in pages:
+        #     if type(page) is dict:
+        #         for k, v in page.items():
+        #             if 'data' in k:
+        #                 for d in page['data']:
+        #                     self.data.append(d)
+        #                     break
+        #             if 'data' in v:
+        #                     for d in v['data']:
+        #                         self.data.append(d)
+        #                         break
+        #             else:
+        #                 self.get_top_data_from_pages(page.items())
+        # for i in self.data:
+        #     if 'comments' in i:
+        #         i['comments'] = i['comments']['data']
+        #         for j in i['comments']:
+        #             if 'comments' in j:
+        #                 j['comments'] = j['comments']['data']
 # see this string - me?fields=id,name,photos
 
         # if self.pages is not None:
@@ -422,12 +432,12 @@ class SaveFace(SaveFaceABC):
         #             self.data = self.pages[0]['posts']['data']
         #             for i in self.pages[1:]:
         #                 self.data = self.data + i['data']
-        #             for i in self.data:
-        #                 if 'comments' in i:
-        #                     i['comments'] = i['comments']['data']
-        #                     for j in i['comments']:
-        #                         if 'comments' in j:
-        #                             j['comments'] = j['comments']['data']
+                    # for i in self.data:
+                    #     if 'comments' in i:
+                    #         i['comments'] = i['comments']['data']
+                    #         for j in i['comments']:
+                    #             if 'comments' in j:
+                    #                 j['comments'] = j['comments']['data']
         return self.data
 
     def get_data_as_classes(self):
@@ -457,7 +467,6 @@ class SaveFace(SaveFaceABC):
     def get_pages_from_pickle(self):
         with open('savefacepickle', 'rb') as infile:
             self.pages = pickle.load(infile)
-        self.__format_()
 
     # https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
     def dict_extract(self, key, var):

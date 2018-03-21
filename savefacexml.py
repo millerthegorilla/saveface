@@ -47,7 +47,7 @@ class SaveFaceXML(SaveFace):
         super().get_data_from_pages()
         for p in self.data:
             self.xmlposts.append(
-                ET.XML(dicttoxml(p, attr_type=False, custom_root='post')))
+                ET.XML(dicttoxml(p, attr_type=False)))
 
     def __format_(self):
         if len(self.pages):
