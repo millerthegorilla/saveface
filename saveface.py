@@ -30,14 +30,20 @@ import threading
 import requests
 import re
 import pickle
+import chardet
+from time import strftime
+import html5lib
+import xmljson
 
 from boundinnerclasses import BoundInnerClass
 from facepy import GraphAPI
 from facepy import exceptions as fpexceptions
 from pathlib import Path
 from queue import Queue
-
-
+import argparse
+from xml.etree import ElementTree as ET
+from dicttoxml import dicttoxml
+from bs4 import BeautifulSoup as bs
 # this is my first go at python
 # so if it seems to be ignoring a host
 # of conventions then that is because
@@ -118,7 +124,8 @@ class SaveFace(SaveFaceABC):
         self._num_images = 0
         self._images_total = 0
         self._imgpath_element = []
-
+        self._default_pickle = strftime("sfp_%d_%m_%y-%H:%M:%S")
+        self._last_pickle = self.__get_last_pickle_()
         # pprint options
         self._compact = False
         self._indent = 4
@@ -332,7 +339,7 @@ class SaveFace(SaveFaceABC):
         """
         Populates a list of dicts representing pages of stored
                     in an array from facebook
-        I wasn't able to get the facepy iterator working, and it 
+        I wasn't able to get the facepy iterator working, and it
         may be my knowledge of python rather than the code on github
         so I will look more at it when I have time.  The code on github
         returned a generator but it cleaned the request dictionary
@@ -396,25 +403,29 @@ class SaveFace(SaveFaceABC):
             print('received {} pages            '.format(num_pages), end='\r')
         self._num_pages = num_pages
         self.pages = pages[:-1]
-        self.__format_()
         return pages
 
-    def __format_(self):
+    def format(self):
         pass
 
     def get_posts_from_pages(self):
         if self.pages is not None:
-            if 'posts' in self.pages[0]:
-                if 'data' in self.pages[0]['posts']:
-                    self.posts = self.pages[0]['posts']['data']
-                    for i in self.pages[1:]:
-                        self.posts = self.posts + i['data']
-                    for i in self.posts:
-                        if 'comments' in i:
-                            i['comments'] = i['comments']['data']
-                            for j in i['comments']:
-                                if 'comments' in j:
-                                    j['comments'] = j['comments']['data']
+            for page in self.pages:
+                self.posts = self.posts + page.get('data',
+                                      lambda: self.pages.get({{'data'}}))  # ,
+                                      # lambda: self.pages.get({{{'data'}}})))
+            # if 'posts' in self.pages[0]:
+            #     if 'data' in self.pages[0]['posts']:
+            #         self.posts = self.pages[0]['posts']['data']
+            #         for i in self.pages[1:]:
+            #             self.posts = self.posts + i['data']
+            #         for i in self.posts:
+            #             if 'comments' in i:
+            #                 i['comments'] = i['comments']['data']
+            #                 for j in i['comments']:
+            #                     if 'comments' in j:
+            #                         j['comments'] = j['comments']['data']
+
         return self.posts
 
     def get_posts_as_classes(self):
@@ -436,15 +447,30 @@ class SaveFace(SaveFaceABC):
         return self.post_classes
 
     # pickle the pages array
-    def save_pages_to_pickle(self):
+    def save_pages_to_pickle(self, pickler=None):
+        if pickler is None:
+            pickler = self._default_pickle
         if self.pages is not None:
-            with open('savefacepickle', 'wb') as outfile:
+            with open(pickler, 'wb') as outfile:
                 pickle.dump(self.pages, outfile)
+            with open('sfdefault', 'wb') as outfile:
+                pickle.dump(pickler, outfile)
 
-    def get_pages_from_pickle(self):
-        with open('savefacepickle', 'rb') as infile:
+    def get_pages_from_pickle(self, pickler=None):
+        if pickler == 'last':
+            pickler = self._last_pickle
+        with open(pickler, 'rb') as infile:
             self.pages = pickle.load(infile)
-        self.__format_()
+
+    def __get_last_pickle_(self):
+        try:
+            with open('sfdefault', 'rb') as infile:
+                try:
+                    return pickle.load(infile)
+                except EOFError:
+                    return self._default_pickle
+        except FileNotFoundError:
+            return self._default_pickle
 
     # https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
     def dict_extract(self, key, var):
@@ -509,9 +535,6 @@ class SaveFace(SaveFaceABC):
         return string
 
     def __repr__(self):
-<<<<<<< master
-        return "<%s()>" % (self.__class__.__name__)
-=======
         return "<%s()>" % (self.__class__.__name__)
 
 
@@ -527,18 +550,16 @@ class SaveFaceXML(SaveFace):
                                      number_of_pages,
                                      request_string,
                                      verbose)
-        self.__format_()
 
-    def get_pages_from_pickle(self):
-        super().get_pages_from_pickle()
-        self.__format_()
+    def get_pages_from_pickle(self, pickle):
+        super().get_pages_from_pickle(pickle)
 
     def get_posts_from_pages(self):
         super().get_posts_from_pages()
         for p in self.posts:
-            self.xmlposts.append(ET.XML(dicttoxml(p, attr_type=False, custom_root='post')))
+            self.xmlposts.append((dicttoxml(p, attr_type=False, custom_root='post'))))))
 
-    def __format_(self):
+    def format(self):
         if len(self.pages):
             for page in self.pages:
                 self.xml.append(ET.XML(dicttoxml(page, attr_type=False, custom_root='page')))
@@ -601,13 +622,11 @@ class SaveFaceHTML(SaveFaceXML):
                                      number_of_pages,
                                      request_string,
                                      verbose)
-        self.__format_()
 
-    def get_pages_from_pickle(self):
-        super().get_pages_from_pickle()
-        self.__format_()
+    def get_pages_from_pickle(self, pickle):
+        super().get_pages_from_pickle(pickle)
 
-    def __format_(self, cssfile='saveface.css'):
+    def format(self, cssfile='saveface.css'):
         self.xhtml = ET.fromstring("<content></content>")
         super().get_posts_from_pages()
 
@@ -857,14 +876,17 @@ def process_args(args):
     elif args.format == 'html':
         sf = SaveFaceHTML()
 
-    if args.source == 'facebook':
+    if args.source is not None:
+        sf.get_pages_from_pickle(args.source)
+        sf.format()
+    elif args.O_Auth_tkn is not None:
         sf.init_graph(args.O_Auth_tkn)
         sf.get_pages_from_graph(request_string=args.request_string)
-    elif args.source == 'pickle':
-        sf.get_pages_from_pickle()
+    else:
+        sys.exit("check auth tkn is present")
 
-    if args.pickle:
-        sf.save_pages_to_pickle()
+    if args.pickle is not None:
+        sf.save_pages_to_pickle(args.pickle)
     # if args.images:
     #     sf.get_images() args.img_folder
 
@@ -918,13 +940,23 @@ if __name__ == "__main__":
                                                   Default request \
                                                   string is :\n\
                                                   " + defaultqstring)
-    parser.add_argument('-g', '--getfrom',
-                        metavar='Where to source the pages from',
+    parser.add_argument('-s', '--save',
+                        metavar='the pickle filename',
                         type=str, required=False, nargs='?',
-                        default='facebook',
-                        help='Optional. Can be one of facebook or pickle.\n\
-                              Defaults to facebook\n',
-                        choices=['facebook', 'pickle'],
+                        default=None,
+                        help='Optional. Use pickle \'filename\' \
+                              to store the array of pages. \
+                              Defaults to sp_d_m_y-H:m:s \
+                              (save time)',
+                        dest='pickle')
+    parser.add_argument('-g', '--getfrom',
+                        metavar='the pickle file name',
+                        type=str, required=False, nargs='?',
+                        default=None,
+                        help='Optional. Pickle filename.\n\
+                              If \'last\' is passed last saved \
+                              pickle is loaded. Fails if file is \
+                              not present.\n',
                         dest='source')
     parser.add_argument('-a', '--auth_tkn',
                         metavar='facebook auth token',
@@ -957,12 +989,6 @@ if __name__ == "__main__":
                         default=False, help='Optional. Output to stdout. \
                                              Defaults to False',
                         dest='stdout')
-    parser.add_argument('-s', '--save',
-                        metavar='pickle the array of pages',
-                        type=bool, required=False, nargs='?',
-                        default=False, help='Optional. Use Pickle to store the array of pages. \
-                                             Defaults to False',
-                        dest='pickle')
     parser.add_argument('-n', '--filename',
                         metavar='filename for the output',
                         type=str, required=False, nargs='?',
@@ -1008,4 +1034,3 @@ if __name__ == "__main__":
                         dest='cssfile')
 
     process_args(parser.parse_args())
->>>>>>> created branch and repaired - editing iframes
