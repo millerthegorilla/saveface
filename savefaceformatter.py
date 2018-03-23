@@ -19,7 +19,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 from xml.etree import ElementTree as ET  # should have used lxml
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
+from bs4 import BeautifulSoup as bs
+from xmljson import yahoo as yh
 
 
 # this is how I will implement the class at
@@ -27,12 +29,12 @@ from abc import ABC, abstractmethod
 # but for the momemt I intent to move on to some thing else
 # and I have a working version in the git history
 # https://www.python.org/dev/peps/pep-3119
-class SaveFaceFormatterABC(ABC):
+class SaveFaceFormatter(ABC):
     def __init__(self):
         pass
 
     @abstractmethod
-    def format(self, xml):
+    def format(self, xml, xmlfunction):
         if xml is None:
             raise ValueError(self.__class__.__name__ +
                              '.format must be passed xml object')
@@ -42,17 +44,17 @@ class SaveFaceFormatterABC(ABC):
         pass
 
     @template.setter
-    @abstractmethod
     def template(self, val):
         pass
 
     @property
     @abstractmethod
-    def html(self):
+    def xhtml(self):
         pass
 
-
-
+    @xhtml.setter
+    def xhtml(self, val):
+        pass
 
 def htmlwrap(element_list, wrapper_element, tags):
     for element in element_list:
@@ -63,6 +65,7 @@ def htmlwrap(element_list, wrapper_element, tags):
                 element.remove(el)
                 wrap_element.append(el)
         element.append(wrap_element)
+
 
 default_html_template = u'<!doctype html>' + \
                         '<html>' + \
@@ -78,10 +81,10 @@ default_html_template = u'<!doctype html>' + \
 # need to subclass this file and put the
 
 # this can be subclassed for different request strings
-class SaveFaceFormatterHTML(SaveFaceFormatterABC):
+class SaveFaceFormatterHTML(SaveFaceFormatter):
     def __init__(self):
         super().__init__()
-        self.xhtml = ET.fromstring("<content></content>")
+        self._xhtml = ET.fromstring("<content></content>")
         self._template = default_html_template
 
     @property
@@ -90,31 +93,36 @@ class SaveFaceFormatterHTML(SaveFaceFormatterABC):
 
     @template.setter
     def template(self, val):
+        super().template = val
         self._template = val
 
     @property
-    def html(self):
-        return self.template.format(ET.tostring(self.xhtml,
-                                                encoding='unicode',
-                                                method='html'))
+    def xhtml(self):
+        return self._template.format(ET.tostring(self._xhtml,
+                                                   encoding='unicode',
+                                                   method='html'))
+
+    @xhtml.setter
+    def xhtml(self, val):
+        super().xhtml = val
+        self._xhtml = val
 
     def format(self, xmlitems, xmlfunction=None):
-        super().format(xmlitems)
+        super().format(xmlitems, xmlfunction)
         if len(xmlitems):
             for p in xmlitems:
-                self.xhtml.append(p)
-                m = p.find('./message')
-                if m is not None and m.text is not None:
-                    m.text = m.text.replace('\n', u'<br>')
-
+                    for el in p:
+                        self._xhtml.append(el)
+                        m = el.find('./message')
+                        if m is not None and m.text is not None:
+                            m.text = m.text.replace('\n', u'<br>')
         if xmlfunction is not None:
-            self.xhtml = xmlfunction(self.xhtml)
+            self._xhtml = xmlfunction(self._xhtml)
 
 
 def htmlformat(xmlitems):
-          # format _xhtml
-        print('hello')
-        print(xmlitems)
+
+        # format _xhtml
         if xmlitems.findall('.//headers') is not None:
             p = xmlitems.findall('.//headers/..')
             for e in p:

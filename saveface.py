@@ -30,7 +30,7 @@ import threading
 import requests
 import re
 import pickle
-import dpath.util
+from time import strftime
 
 from boundinnerclasses import BoundInnerClass
 from facepy import GraphAPI
@@ -134,6 +134,8 @@ class SaveFace(SaveFaceABC):
         self.pages = []  # the result dictionary
         self.data = []
         self.data_classes = []  # the data class objects
+        self._default_pickle = strftime("sfp_%d_%m_%y-%H:%M:%S")
+        self._last_pickle = self.__get_last_pickle_()
 
     def __download_(self, elements, numthreads=4):
         """
@@ -394,50 +396,11 @@ class SaveFace(SaveFaceABC):
 
     def get_data_from_pages(self):
         for page in self.pages:
-            for i in self.dict_extract('data', page):
-                self.data = self.data + i
-        for i in self.data:
-            if 'comments' in i:
-                if 'data' in i['comments']:
-                    i['comments'] = i['comments']['data']
-                for j in i['comments']:
-                    if 'comments' in j:
-                        j['comments'] = j['comments']['data']
+            self.data = self.data + self.pretty_search(page, 'data', True)
 
-    def get_top_data_from_pages(self, pages):
-        # for page in pages:
-        #     if type(page) is dict:
-        #         for k, v in page.items():
-        #             if 'data' in k:
-        #                 for d in page['data']:
-        #                     self.data.append(d)
-        #                     break
-        #             if 'data' in v:
-        #                     for d in v['data']:
-        #                         self.data.append(d)
-        #                         break
-        #             else:
-        #                 self.get_top_data_from_pages(page.items())
-        # for i in self.data:
-        #     if 'comments' in i:
-        #         i['comments'] = i['comments']['data']
-        #         for j in i['comments']:
-        #             if 'comments' in j:
-        #                 j['comments'] = j['comments']['data']
-# see this string - me?fields=id,name,photos
-
-        # if self.pages is not None:
-        #     if 'posts' in self.pages[0]:
-        #         if 'data' in self.pages[0]['posts']:
-        #             self.data = self.pages[0]['posts']['data']
-        #             for i in self.pages[1:]:
-        #                 self.data = self.data + i['data']
-                    # for i in self.data:
-                    #     if 'comments' in i:
-                    #         i['comments'] = i['comments']['data']
-                    #         for j in i['comments']:
-                    #             if 'comments' in j:
-                    #                 j['comments'] = j['comments']['data']
+            # self.data = self.data + page.get('data',
+            #                                  lambda: 'comments' in page['data'] or page.get({'data'},                                                            page.get({'data'},
+            #                                  lambda: 'comments' in page['data'] or page.get({'data'})))
         return self.data
 
     def get_data_as_classes(self):
@@ -459,14 +422,31 @@ class SaveFace(SaveFaceABC):
         return self.data_classes
 
     # pickle the pages array
-    def save_pages_to_pickle(self):
+    def save_pages_to_pickle(self, pickler='default_pickle'):
+        if pickler is 'default_pickle':
+            pickler = self._default_pickle
         if self.pages is not None:
-            with open('savefacepickle', 'wb') as outfile:
+            with open(pickler, 'wb') as outfile:
                 pickle.dump(self.pages, outfile)
+            with open('sfdefault', 'wb') as outfile:
+                pickle.dump(pickler, outfile)
 
-    def get_pages_from_pickle(self):
-        with open('savefacepickle', 'rb') as infile:
+    def get_pages_from_pickle(self, pickler=None):
+        if pickler == 'last':
+            pickler = self._last_pickle
+        with open(pickler, 'rb') as infile:
             self.pages = pickle.load(infile)
+        self.format()
+
+    def __get_last_pickle_(self):
+        try:
+            with open('sfdefault', 'rb') as infile:
+                try:
+                    return pickle.load(infile)
+                except EOFError:
+                    return self._default_pickle
+        except FileNotFoundError:
+            return self._default_pickle
 
     # https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
     def dict_extract(self, key, var):
@@ -481,6 +461,46 @@ class SaveFace(SaveFaceABC):
                     for d in v:
                         for result in self.dict_extract(key, d):
                             yield result
+
+    # https://stackoverflow.com/questions/8383136/parsing-json-and-searching-through-it
+    def pretty_search(self, dict_or_list, key_to_search, search_for_first_only=False):
+        """
+        Give it a dict or a list of dicts and a dict key (to get values of),
+        it will search through it and all containing dicts and arrays
+        for all values of dict key you gave, and will return you set of them
+        unless you wont specify search_for_first_only=True
+
+        :param dict_or_list:
+        :param key_to_search:
+        :param search_for_first_only:
+        :return:
+        """
+        search_result = set()
+        if isinstance(dict_or_list, dict):
+            for key in dict_or_list:
+                key_value = dict_or_list[key]
+                if key == key_to_search:
+                    if search_for_first_only:
+                        return key_value
+                    else:
+                        search_result.add(key_value)
+                if isinstance(key_value, dict) or isinstance(key_value, list) or isinstance(key_value, set):
+                    _search_result = pretty_search(key_value, key_to_search, search_for_first_only)
+                    if _search_result and search_for_first_only:
+                        return _search_result
+                    elif _search_result:
+                        for result in _search_result:
+                            search_result.add(result)
+        elif isinstance(dict_or_list, list) or isinstance(dict_or_list, set):
+            for element in dict_or_list:
+                if isinstance(element, list) or isinstance(element, set) or isinstance(element, dict):
+                    _search_result = pretty_search(element, key_to_search, search_result)
+                    if _search_result and search_for_first_only:
+                        return _search_result
+                    elif _search_result:
+                        for result in _search_result:
+                            search_result.add(result)
+        return search_result if search_result else None
 
     def init_path(self, filename, filepath, overwrite):
         if not Path(filepath).exists():
@@ -530,5 +550,5 @@ class SaveFace(SaveFaceABC):
             string = string + page
         return string
 
-    def __repr__(self):
-        return "<%s()>" % (self.__class__.__name__)
+    # def __repr__(self):
+    #     return "<%s()>" % (self.__class__.__name__)

@@ -22,7 +22,7 @@ import sys
 from savefacexml import SaveFaceXML
 from savefacehtml import SaveFaceHTML
 from savefacejson import SaveFaceJSON
-from savefaceformatter import SaveFaceFormatterHTML as sfformat
+from savefaceformatter import SaveFaceFormatterHTML as sfmt
 from savefaceformatter import htmlformat
 import argparse
 # below needs to be overloaded to do anything useful
@@ -51,20 +51,19 @@ def process_args(args):
     elif args.format == 'html':
         sf = SaveFaceHTML()
 
-    if args.source == 'facebook':
+    if args.pickle_load_file is not None:
+        sf.get_pages_from_pickle(args.pickle_load_file)
+    elif args.O_Auth_tkn is not None:
         sf.init_graph(args.O_Auth_tkn)
         sf.get_pages_from_graph(request_string=args.request_string)
-    elif args.source == 'pickle':
-        sf.get_pages_from_pickle()
+    else:
+        sys.exit("check auth tkn is present")
 
     if args.format == 'html':
         sf.get_data_from_pages()
-        sfmt = sfformat()
-        sf.init_html(sfmt, htmlformat)
-    if args.pickle:
-        sf.save_pages_to_pickle()
-    # if args.images:
-    #     sf.get_images() args.img_folder
+        sf.init_html(Formatter=sfmt, function=htmlformat)
+    if args.pickle_save_file is not None:
+        sf.save_pages_to_pickle(args.pickle_save_file)
 
     if args.stdout:
         print(str(sf))
@@ -116,14 +115,24 @@ if __name__ == "__main__":
                                                   Default request \
                                                   string is :\n\
                                                   " + defaultqstring)
-    parser.add_argument('-g', '--getfrom',
-                        metavar='Where to source the pages from',
+    parser.add_argument('-s', '--save',
+                        metavar='the pickle filename',
                         type=str, required=False, nargs='?',
-                        default='facebook',
-                        help='Optional. Can be one of facebook or pickle.\n\
-                              Defaults to facebook\n',
-                        choices=['facebook', 'pickle'],
-                        dest='source')
+                        default=None, const="default_pickle",
+                        help='Optional. Use pickle \'filename\' \
+                              to store the array of pages. \
+                              Defaults to sp_d_m_y-H:m:s \
+                              (save time)',
+                        dest='pickle_save_file')
+    parser.add_argument('-g', '--getfrom',
+                        metavar='the pickle file name',
+                        type=str, required=False, nargs='?',
+                        default=None, const='last',
+                        help='Optional. Pickle filename.\n\
+                              If no filename then last saved \
+                              pickle is loaded. Fails if file is \
+                              not present.\n',
+                        dest='pickle_load_file')
     parser.add_argument('-a', '--auth_tkn',
                         metavar='facebook auth token',
                         type=str, required=False, nargs='?',
@@ -155,12 +164,6 @@ if __name__ == "__main__":
                         default=False, help='Optional. Output to stdout. \
                                              Defaults to False',
                         dest='stdout')
-    parser.add_argument('-s', '--save',
-                        metavar='pickle the array of pages',
-                        type=bool, required=False, nargs='?',
-                        default=False, help='Optional. Use Pickle to store the array of pages. \
-                                             Defaults to False',
-                        dest='pickle')
     parser.add_argument('-n', '--filename',
                         metavar='filename for the output',
                         type=str, required=False, nargs='?',

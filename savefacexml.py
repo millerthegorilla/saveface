@@ -22,14 +22,14 @@
 from saveface import SaveFace
 
 from xml.etree import ElementTree as ET  # should have used lxml
-from dicttoxml import dicttoxml
+from xmljson import yahoo as yh
 
 
 class SaveFaceXML(SaveFace):
     def __init__(self):
         super().__init__()
         self.xml = ET.fromstring("<content></content>")
-        self.xmlposts = []
+        self.xmldata = []
 
     def get_pages_from_graph(self, graph=None, number_of_pages=None,
                              request_string=None, verbose=True):
@@ -37,24 +37,26 @@ class SaveFaceXML(SaveFace):
                                      number_of_pages,
                                      request_string,
                                      verbose)
-        self.__format_()
+        self.format()
 
-    def get_pages_from_pickle(self):
-        super().get_pages_from_pickle()
-        self.__format_()
+    def get_pages_from_pickle(self, pickle_file):
+        super().get_pages_from_pickle(pickle_file)
+        self.format()
 
     def get_data_from_pages(self):
         super().get_data_from_pages()
+        self.format()
         for p in self.data:
-            self.xmlposts.append(
-                ET.XML(dicttoxml(p, attr_type=False)))
+            self.xmldata.append(yh.etree(p))
+                # ET.XML(dicttoxml(p, attr_type=False)))
 
-    def __format_(self):
+    def format(self):
         if len(self.pages):
             for page in self.pages:
-                self.xml.append(
-                    ET.XML(dicttoxml(
-                        page, attr_type=False, custom_root='page')))
+                for el in yh.etree(page):
+                    self.xml.append(el)
+                    # ET.XML(dicttoxml(
+                      #   page, attr_type=False, custom_root='page')))
 
     def write(self, filename, filepath, overwrite=True):
         """
