@@ -23,6 +23,7 @@ from savefacexml import SaveFaceXML
 from savefacehtml import SaveFaceHTML
 from savefacejson import SaveFaceJSON
 from savefaceformatter import SaveFaceFormatterHTML as sfmt
+from savefaceformatter import SaveFaceFormatterXML as xfmt
 from savefaceformatter import htmlformat
 import argparse
 # below needs to be overloaded to do anything useful
@@ -39,7 +40,7 @@ def process_args(args):
     """
     sf = None
     if args.format == 'xml':
-        sf = SaveFaceXML()
+        sf = SaveFaceXML(xfmt(htmlformat))
     elif args.format == 'json':
         sf = SaveFaceJSON()
     elif args.format == 'pjson':
@@ -49,7 +50,7 @@ def process_args(args):
                           width=args.pprint_opts['width'],
                           depth=args.pprint_opts['depth'])
     elif args.format == 'html':
-        sf = SaveFaceHTML()
+        sf = SaveFaceHTML(sfmt(htmlformat))
 
     if args.pickle_load_file is not None:
         sf.get_pages_from_pickle(args.pickle_load_file)
@@ -61,9 +62,10 @@ def process_args(args):
 
     if args.format == 'html':
         sf.get_data_from_pages()
-        sf.init_html(Formatter=sfmt, function=htmlformat)
-    if args.pickle_save_file is not None:
-        sf.save_pages_to_pickle(args.pickle_save_file)
+    if args.format == 'xml':
+        sf.get_data_from_pages()
+        if args.pickle_save_file is not None:
+            sf.save_pages_to_pickle(args.pickle_save_file)
 
     if args.stdout:
         print(str(sf))
@@ -186,20 +188,20 @@ if __name__ == "__main__":
                         help="Optional. Options for pprint module.\n\
                               key=value with comma ie -p [indent=4, depth=80]",
                         dest='pprint_opts')
-    parser.add_argument('-i', '--images',
-                        metavar='download images?',
-                        type=bool, required=False, nargs='?',
-                        default=False, help='Optional.  A boolean to indicate \
-                                             whether or not to download \
-                                             images. Defaults to False',
-                        dest='images')
-    parser.add_argument('-d', '--image_path',
-                        metavar='path to images',
-                        type=str, required=False, nargs='?',
-                        default='images', help='Optional. The path to the \
-                                                images folder.\
-                                                Defaults to ./images',
-                        dest='img_folder')
+    # parser.add_argument('-i', '--images',
+    #                     metavar='download images?',
+    #                     type=bool, required=False, nargs='?',
+    #                     default=False, help='Optional.  A boolean to indicate \
+    #                                          whether or not to download \
+    #                                          images. Defaults to False',
+    #                     dest='images')
+    # parser.add_argument('-d', '--image_path',
+    #                     metavar='path to images',
+    #                     type=str, required=False, nargs='?',
+    #                     default='images', help='Optional. The path to the \
+    #                                             images folder.\
+    #                                             Defaults to ./images',
+    #                     dest='img_folder')
     parser.add_argument('-c', '--css',
                         metavar='css filename',
                         type=str, required=False, nargs='?',

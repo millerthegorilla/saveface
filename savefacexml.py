@@ -19,17 +19,19 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from saveface import SaveFace
-
+from savefacejson import SaveFaceJSON
 from xml.etree import ElementTree as ET  # should have used lxml
 from xmljson import yahoo as yh
+import html5lib
+from dicttoxml import dicttoxml
 
 
-class SaveFaceXML(SaveFace):
-    def __init__(self):
-        super().__init__()
-        self.xml = ET.fromstring("<content></content>")
-        self.xmldata = []
+class SaveFaceXML(SaveFaceJSON):
+
+    def __init__(self, formatter=None):
+        super().__init__(formatter=None)
+        self.formatter = formatter
+        self.xml_data = []
 
     def get_pages_from_graph(self, graph=None, number_of_pages=None,
                              request_string=None, verbose=True):
@@ -41,22 +43,24 @@ class SaveFaceXML(SaveFace):
 
     def get_pages_from_pickle(self, pickle_file):
         super().get_pages_from_pickle(pickle_file)
-        self.format()
 
     def get_data_from_pages(self):
         super().get_data_from_pages()
-        self.format()
-        for p in self.data:
-            self.xmldata.append(yh.etree(p))
-                # ET.XML(dicttoxml(p, attr_type=False)))
+        for data in self.json_data:
+            try:
+                self.xml_data.append(
+                    html5lib.parse(dicttoxml(data,
+                                             attr_type=False,
+                                             custom_root='item').decode('utf-8')))
+            except (ET.ParseError, AttributeError) as e:
+                print(e)
+                pass
 
-    def format(self):
-        if len(self.pages):
-            for page in self.pages:
-                for el in yh.etree(page):
-                    self.xml.append(el)
-                    # ET.XML(dicttoxml(
-                      #   page, attr_type=False, custom_root='page')))
+                # self.xml_data.append(html.parse(yh.parse(p)))
+
+    @property
+    def xml(self):
+        return self.formatter.xml
 
     def write(self, filename, filepath, overwrite=True):
         """
@@ -101,4 +105,5 @@ class SaveFaceXML(SaveFace):
         pass  # TODO
 
     def __str__(self):
+        import pdb; pdb.set_trace()  # breakpoint fe678819 //
         return ET.tostring(self.xml, encoding="unicode", method="xml")

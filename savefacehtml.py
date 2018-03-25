@@ -20,16 +20,13 @@
 # SOFTWARE.
 from savefacexml import SaveFaceXML
 from bs4 import BeautifulSoup as bs
-import html5lib
 
 
 class SaveFaceHTML(SaveFaceXML):
 
-    def __init__(self):
-        super().__init__()
-        self.html = ''
-        self.formatter = None
-        self.formatterfunc = None
+    def __init__(self, formatter=None):
+        super().__init__(formatter)
+        self._html = ''
 
     def get_pages_from_pickle(self, pickle_file):
         super().get_pages_from_pickle(pickle_file)
@@ -52,11 +49,9 @@ class SaveFaceHTML(SaveFaceXML):
         self.get_data_from_pages()
         return self.data
 
-    def init_html(self, Formatter, function):
-        self.formatter = Formatter()
-        self.formatterfunc = function
-        self.formatter.format(self.xmldata, function)
-        self.html = self.formatter.xhtml
+    @property
+    def html(self):
+        return self.formatter.html
 
     # todo - add xml_declaration
     def write(self, filename, filepath, overwrite=True):
@@ -72,7 +67,4 @@ class SaveFaceHTML(SaveFaceXML):
             output.write(bs(self.html, "html.parser").prettify(formatter=None))
 
     def __str__(self):
-        if self.html is not None:
-            return bs(self.html, "html.parser").prettify()
-        else:
-            return "init_html first!"
+        return bs(self.html, "html.parser").prettify()
