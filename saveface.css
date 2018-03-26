@@ -104,7 +104,7 @@ table {
 	padding-right: 1vw;
 }
 
-.content .message {
+.content .message, .content .story {
 	display: flex;
 	flex-direction: row;
 	justify-content: flex-start;

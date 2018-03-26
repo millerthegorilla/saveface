@@ -21,9 +21,11 @@
 
 from savefacejson import SaveFaceJSON
 from xml.etree import ElementTree as ET  # should have used lxml
-from xmljson import yahoo as yh
 import html5lib
 from dicttoxml import dicttoxml
+from bs4 import BeautifulSoup as bs
+import re
+import html
 
 
 class SaveFaceXML(SaveFaceJSON):
@@ -39,7 +41,6 @@ class SaveFaceXML(SaveFaceJSON):
                                      number_of_pages,
                                      request_string,
                                      verbose)
-        self.format()
 
     def get_pages_from_pickle(self, pickle_file):
         super().get_pages_from_pickle(pickle_file)
@@ -49,14 +50,24 @@ class SaveFaceXML(SaveFaceJSON):
         for data in self.json_data:
             try:
                 self.xml_data.append(
-                    html5lib.parse(dicttoxml(data,
-                                             attr_type=False,
-                                             custom_root='item').decode('utf-8')))
+                    html5lib.parseFragment(dicttoxml(data,
+                                           attr_type=False,
+                                           custom_root='item',
+                                           root=False).decode('utf-8'),
+                                           namespaceHTMLElements=False))
+
+                try:
+                    m = self.xml_data[-1].find('./message/.').text
+                    m = html.unescape(m)
+                    # m = re.sub(r'[\x00-\x1F]',
+                    #            lambda x: '<![CDATA[' + x.string + ']]', m)
+                    # m = re.sub(r'<(.)*?>',
+                    #            lambda x: '<![CDATA[' + x.string + ']]', m)
+                    self.print_progress(len(self.xml_data), len(self.json_data), 'Constructing XML...')
+                except KeyError as e:
+                    self.log(msg=e, level='info', output=False)
             except (ET.ParseError, AttributeError) as e:
                 print(e)
-                pass
-
-                # self.xml_data.append(html.parse(yh.parse(p)))
 
     @property
     def xml(self):
@@ -71,10 +82,8 @@ class SaveFaceXML(SaveFaceJSON):
         """
         super().write(filename, filepath, overwrite)
         try:
-            with open(filename, 'wb') as output:
-                ET.ElementTree(self.xml).write(output,
-                                               encoding="UTF-8",
-                                               xml_declaration=True)
+            with open(filename, 'w') as output:
+                output.write(self.formatter.template)
         except IOError as e:
             print(type(e))
             print(e.args)
@@ -105,5 +114,4 @@ class SaveFaceXML(SaveFaceJSON):
         pass  # TODO
 
     def __str__(self):
-        import pdb; pdb.set_trace()  # breakpoint fe678819 //
-        return ET.tostring(self.xml, encoding="unicode", method="xml")
+        return bs(ET.tostring(self.xml), "html.parser").prettify()

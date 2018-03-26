@@ -25,6 +25,7 @@ from savefacejson import SaveFaceJSON
 from savefaceformatter import SaveFaceFormatterHTML as sfmt
 from savefaceformatter import SaveFaceFormatterXML as xfmt
 from savefaceformatter import htmlformat
+from savefaceformatter import xmlformat
 import argparse
 # below needs to be overloaded to do anything useful
 # from argparse import RawTextHelpFormatter
@@ -40,7 +41,7 @@ def process_args(args):
     """
     sf = None
     if args.format == 'xml':
-        sf = SaveFaceXML(xfmt(htmlformat))
+        sf = SaveFaceXML(xfmt(xmlformat))
     elif args.format == 'json':
         sf = SaveFaceJSON()
     elif args.format == 'pjson':
@@ -64,11 +65,12 @@ def process_args(args):
         sf.get_data_from_pages()
     if args.format == 'xml':
         sf.get_data_from_pages()
+        sf.formatter.format(sf.xml_data)
         if args.pickle_save_file is not None:
             sf.save_pages_to_pickle(args.pickle_save_file)
 
     if args.stdout:
-        print(str(sf))
+        print(sf.formatter.template)
     if args.filename is not None:
         sf.write(args.filename, args.filepath)
 

@@ -22,6 +22,10 @@ from xml.etree import ElementTree as ET  # should have used lxml
 from abc import ABC, abstractmethod, abstractproperty
 from bs4 import BeautifulSoup as bs
 from xmljson import yahoo as yh
+import html
+from pprint import pprint
+from html5print import HTMLBeautifier
+import re
 
 
 # https://www.python.org/dev/peps/pep-3119
@@ -56,9 +60,9 @@ def htmlwrap(element_list, wrapper_element, tags):
         element.append(wrap_element)
 
 
-default_json_template = u''
+default_json_template = u'{}'
 
-default_xml_template = u'<root>{}</root>'
+default_xml_template = u'<?xml version="1.0" encoding="UTF-8" standalone="yes" ?><root>{}</root>'
 
 default_html_template = u'<!doctype html>' + \
                         '<html>' + \
@@ -73,14 +77,14 @@ default_html_template = u'<!doctype html>' + \
 
 class SaveFaceFormatterJSON(SaveFaceFormatter):
     def __init__(self, formatter_func=None):
-        super().__init__(formatter_func=None)
+        super().__init__(formatter_func)
         self._formatter_func = formatter_func
         self._json = ''
         self._template = default_json_template
 
     @property
     def template(self):
-        return self._template
+        return self._template.format(self._json)
 
     @template.setter
     def template(self, val):
@@ -88,15 +92,8 @@ class SaveFaceFormatterJSON(SaveFaceFormatter):
         self._template = val
 
     @property
-    def xml(self):
-        return self._template.format(ET.tostring(self._xml,
-                                                 encoding='unicode',
-                                                 method='xml'))
-
-    @xml.setter
-    def xml(self, val):
-        super().xml = val
-        self._xml = val
+    def json(self):
+        return self._json
 
     def format(self, data):
         super().format(data)
@@ -104,14 +101,15 @@ class SaveFaceFormatterJSON(SaveFaceFormatter):
 
 class SaveFaceFormatterXML(SaveFaceFormatterJSON):
     def __init__(self, formatter_func=None):
-        super().__init__(formatter_func=None)
-        self._formatter_func = formatter_func
-        self._xml = ET.fromstring('<?xml version="1.0" encoding="UTF-8"?><content></content>')
+        super().__init__(formatter_func)
+        self._xml = ET.fromstring('<content></content>')
         self._template = default_xml_template
 
     @property
     def template(self):
-        return self._template
+        return self._template.format(HTMLBeautifier.beautify(html.unescape(ET.tostring(self._xml,
+                                                   encoding='unicode',
+                                                   method='html')), 4))
 
     @template.setter
     def template(self, val):
@@ -120,38 +118,33 @@ class SaveFaceFormatterXML(SaveFaceFormatterJSON):
 
     @property
     def xml(self):
-        return self._template.format(ET.tostring(self._xml,
-                                                 encoding='unicode',
-                                                 method='xml'))
-
-    @xml.setter
-    def xml(self, val):
-        super().xml = val
-        self._xml = val
+        return self._xml
 
     def format(self, data):
         super().format(data)
         if len(data):
             for p in data:
-                    for el in p:
-                        self._xml.append(el)
-                        m = el.find('./message')
-                        if m is not None and m.text is not None:
-                            m.text = m.text.replace('\n', u'<br>')
-        if xmlfunction is not None:
-            self._xml = xmlfunction(self._xml)
+                for el in p:
+                    self._xml.append(el)
+        if self._formatter_func is not None:
+            self._xml = self._formatter_func(self._xml)
+
+    def __str__(self):
+        return bs(self._xml, "html.parser").prettify()
 
 
 # this can be subclassed for different request strings
 class SaveFaceFormatterHTML(SaveFaceFormatterXML):
     def __init__(self):
         super().__init__(formatter_func=None)
-        self._html = ET.fromstring("<content></content>")
+        self._html = ET.XML("<content></content>")
         self._template = default_html_template
 
     @property
     def template(self):
-        return self._template
+        return self._template.format(HTMLBeautifier.beautify(html.unescape(ET.tostring(self._xml,
+                                                   encoding='unicode',
+                                                   method='html')), 4))
 
     @template.setter
     def template(self, val):
@@ -160,32 +153,63 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
 
     @property
     def html(self):
-        return self._template.format(ET.tostring(self._html,
-                                                 encoding='unicode',
-                                                 method='html'))
-
-    @html.setter
-    def xhtml(self, val):
-        super().html = val
-        self._html = val
+        return self._html
 
     def format(self, data):
-        super().format(xmlitems, xmlfunction)
+        super().format(data)
+
+    def __str__(self):
+        return bs(self._html, "html.parser").prettify()
 
 
-def htmlformat(xmlitems):
+def xmlformat(xmltree):
     # format _xhtml
-    if xmlitems.findall('.//headers') is not None:
-        p = xmlitems.findall('.//headers/..')
+    def repl_func(match):
+        return match.string.replace('<', '') \
+                           .replace('@', ' [ @ ] ') \
+                           .replace('>', '')
+
+    if xmltree.findall('.//headers') is not None:
+        p = xmltree.findall('.//headers/..')
         for e in p:
             e.remove(e.find('./headers'))
 
-    if xmlitems.findall('.//paging') is not None:
-        p = xmlitems.findall('.//paging/..')
+    if xmltree.findall('.//paging') is not None:
+        p = xmltree.findall('.//paging/..')
         for e in p:
             e.remove(e.find('./paging'))
 
-    for i in xmlitems.findall('.//attachment/.'):
+    for i in xmltree.iterfind('.//message/.'):
+        # if i.text.find('gales.me') != -1:
+        #     i.text.replace('<james@gales.me','\<james[@]gales.me\>')
+
+        i.text = re.sub(
+            '<([^>]+)>',
+            repl_func,
+            i.text,
+            flags=re.IGNORECASE)
+
+    return xmltree
+
+
+def htmlformat(xmltree):
+    # TODO replace all None checks with except
+    if xmltree.findall('.//message') is not None:
+        el = xmltree.findall('.//message')
+        for e in el:
+            e.text = e.text.replace('\n', u'<br>')
+
+    if xmltree.findall('.//headers') is not None:
+        p = xmltree.findall('.//headers/..')
+        for e in p:
+            e.remove(e.find('./headers'))
+
+    if xmltree.findall('.//paging') is not None:
+        p = xmltree.findall('.//paging/..')
+        for e in p:
+            e.remove(e.find('./paging'))
+
+    for i in xmltree.findall('.//attachment/.'):
         if i.find('./media') is not None:
             i.remove(i.find('./media'))
         j = i.find('url')
@@ -222,19 +246,19 @@ def htmlformat(xmlitems):
                 else:
                     title = "iframe"
 
-    for i in xmlitems.findall('.//posts/.'):
+    for i in xmltree.findall('.//posts/.'):
         e = ET.Element('p', attrib={'class': 'posts-title'})
         e.text = '<strong>Posts</strong>'
         i.insert(0, e)
 
-    for i in xmlitems.findall('.//comments/.'):
+    for i in xmltree.findall('.//comments/.'):
         import pdb; pdb.set_trace()  # breakpoint 2448c19b //
         e = ET.Element('p', attrib={'class': 'comments-title'})
         e.text = '<strong>Comments</strong>'
         i.insert(0, e)
 
-    if xmlitems.findall('.//photos/.'):
-        for i in xmlitems.findall('.//picture/..'):
+    if xmltree.findall('.//photos/.'):
+        for i in xmltree.findall('.//picture/..'):
             pid = i.find('./id')
             if pid.text is not None:
                 a = ET.Element('a',
@@ -246,36 +270,36 @@ def htmlformat(xmlitems):
                 pid.insert(0, a)
                 pid.text = None
                 pid.tag = 'photo-id'
-        for i in xmlitems.findall('.//photos/data/item'):
+        for i in xmltree.findall('.//photos/data/item'):
             i.tag = 'photo'
 
-    for i in xmlitems.findall('.//item/id/.'):
+    for i in xmltree.findall('.//item/id/.'):
         e = ET.Element('p', attrib={'class': 'comment-id'})
         e.text = 'comment id : ' + i.text
         i.append(e)
         i.text = None
 
-    for i in xmlitems.findall('.//post/id/.'):
+    for i in xmltree.findall('.//post/id/.'):
         e = ET.Element('p', attrib={'class': 'post-id'})
         e.text = 'post id : ' + i.text
         i.append(e)
         i.text = None
 
-    p = xmlitems.findall('.//picture')
-    fp = xmlitems.findall('.//full_picture')
+    p = xmltree.findall('.//picture')
+    fp = xmltree.findall('.//full_picture')
     fpp = p + fp
     for el in fpp:
         el.insert(0, ET.Element('img', attrib={'class': 'image',
                                                'src': el.text}))
         el.text = None
 
-    for el in xmlitems.findall('.//created_time'):
+    for el in xmltree.findall('.//created_time'):
         el.tag = 'a'
         el.attrib = {'class': 'created_time', 'name': el.text}
 
-    for el in xmlitems.iter():
+    for el in xmltree.iter():
         if el.tag not in ['img', 'p', 'a']:
             el.attrib = {'class': el.tag, **el.attrib}
             el.tag = 'div'
 
-    return xmlitems
+    return xmltree

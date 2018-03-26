@@ -62,8 +62,10 @@ class SaveFaceJSON(SaveFace):
         self._img_folder = 'images'
 
         # public variables
-        self.filename = ""
-        self.filepath = ""
+        self.request_string = ''
+        self.O_Auth_tkn = ''
+        self.filename = ''
+        self.filepath = ''
         self.pages = []  # the result dictionary
         self.json_data = []
         self.data_classes = []  # the data class objects
@@ -75,7 +77,7 @@ class SaveFaceJSON(SaveFace):
         return self.formatter.json
 
     # graph functions
-    def init_graph(self, O_Auth_tkn=None):
+    def init_graph(self):
         """
             set the internal graph object
         Args:
@@ -85,11 +87,11 @@ class SaveFaceJSON(SaveFace):
         Raises:
             ValueError: Description
         """
-        super().init_graph(O_Auth_tkn)
+        super().init_graph()
 
-        if O_Auth_tkn is not None:
+        if self.O_Auth_tkn is not None:
             try:
-                graph = GraphAPI(O_Auth_tkn)
+                graph = GraphAPI(self.O_Auth_tkn)
             except (fpexceptions.OAuthError, fpexceptions.HTTPError) as e:
                 print(type(e))
                 print(e.args)
@@ -99,8 +101,7 @@ class SaveFaceJSON(SaveFace):
 
         self._graph = graph
 
-    def get_page_from_graph(self, request_string=None,
-                            graph=None, verbose=True):
+    def get_page_from_graph(self):
         """
             Gets a page from the facebook graph
         Args:
@@ -114,32 +115,29 @@ class SaveFaceJSON(SaveFace):
             fpexceptions.FacepyError:
                facepy request errors
         """
-        super().get_page_from_graph(request_string, graph, verbose)
+        super().get_page_from_graph(request_string)
 
         if self._graph is None:
             raise ValueError("graph must be initialised")
 
-        if request_string is None:
+        if self.request_string is None:
             raise ValueError("request_string must be defined")
 
         try:
-            return graph.get(request_string)
+            return self._graph.get(request_string)
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
                 fpexceptions.FacepyError) as e:
             raise e
 
-    def request_page_from_graph(self, request_string=None, verbose=True):
+    def request_page_from_graph(self, request_string=None):
         super().request_page_from_graph(request_string, verbose)
-
-        if self._graph is None:
-            raise ValueError("graph must be initialised")
 
         if request_string is None:
             raise ValueError("request_string must be defined")
 
         try:
-            return requests.get(request_string).json()
+            return requests.get(request_string).encoding('utf-8').json()
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
                 fpexceptions.FacepyError) as e:
@@ -171,13 +169,12 @@ class SaveFaceJSON(SaveFace):
         """
         super().get_pages_from_graph(graph,
                                      number_of_pages,
-                                     request_string,
                                      verbose)
 
         num_pages = 0
         pages = []
         found = False
-        pages.append(self.request_page_from_graph(request_string))
+        pages.append(self.get_page_from_graph(request_string))
         try:
             while True:
                 for np in self.dict_extract('next', pages[-1]):
@@ -204,7 +201,8 @@ class SaveFaceJSON(SaveFace):
             print(e)
 
         if verbose:
-            print('received {} pages            '.format(num_pages), end='\r')
+            print('received {} pages            '
+                  .format(num_pages), end='\r')
         self._num_pages = num_pages
         self.pages = pages[:-1]
 
@@ -212,9 +210,11 @@ class SaveFaceJSON(SaveFace):
         for page in self.pages:
             # TODO :  Here I need to put any top level data that is
             # above the first instance of data
-            e = pretty_search(page, 'data', True)
-            if e is not None:
-                self.json_data = self.json_data + e
+            try:
+                self.json_data = self.json_data + \
+                    pretty_search(page, 'data', True)
+            except AttributeError as e:
+                self.log(e + e.args, 'info')
 
     def get_data_as_classes(self):
         class Post:
@@ -247,13 +247,13 @@ class SaveFaceJSON(SaveFace):
         if pickler == 'last':
             pickler = self._last_pickle
         with open(pickler, 'rb') as infile:
-            self.pages = pickle.load(infile)
+            self.pages = pickle.load(infile, encoding='utf-8')
 
     def __get_last_pickle_(self):
         try:
             with open('sfdefault', 'rb') as infile:
                 try:
-                    return pickle.load(infile)
+                    return pickle.load(infile, encoding='utf-8')
                 except EOFError:
                     return self._default_pickle
         except FileNotFoundError:
@@ -276,7 +276,7 @@ class SaveFaceJSON(SaveFace):
         super().write(filename, filepath, overwrite)
         self.init_path(filename, filepath, overwrite)
 
-    def print_progress(iteration, total, prefix='',
+    def print_progress(self, iteration, total, prefix='',
                        suffix='', decimals=1, bar_length=100):
         """
         Call in a loop to create terminal progress bar
@@ -289,17 +289,27 @@ class SaveFaceJSON(SaveFace):
         decimals (Int)- Optional  : positive number of decimals in % complete
         bar_length(Int)- Optional : character length of bar
         """
+        def terminal_size():
+            import fcntl, termios, struct
+            th, tw, hp, wp = struct.unpack('HHHH',
+                fcntl.ioctl(0, termios.TIOCGWINSZ,
+                struct.pack('HHHH', 0, 0, 0, 0)))
+            return tw, th
+
+        termwidth = terminal_size()[0]
+        if bar_length > termwidth:
+            bar_length = termwidth - (len(prefix) + len(suffix) + 12)
         str_format = "{0:." + str(decimals) + "f}"
         percents = str_format.format(100 * (iteration / float(total)))
         filled_length = int(round(bar_length * iteration / float(total)))
         bar = '█' * filled_length + '-' * (bar_length - filled_length)
 
-        sys.stdout.write('\r%s |%s| %s%s %s' %
-                         (prefix, bar, percents, '%', suffix))
+        #sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),
+        print(f"{prefix} |{bar}| {percents}% {suffix}", end="\r")
 
         if iteration == total:
-            sys.stdout.write('\n')
-        sys.stdout.flush()
+            sys.stdout.write('\nFormatting...')
+        #sys.stdout.flush()
 
     def __str__(self):
         string = ""

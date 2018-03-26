@@ -23,6 +23,7 @@
    It will output json, xml, or html with pictures.
 """
 from abc import ABC, abstractmethod
+import logging
 
 
 # TODO: determine what methods go here, for
@@ -76,6 +77,17 @@ class SaveFace(ABC):
     @abstractmethod
     def write(self, results, filename, filepath, overwrite=True):
         pass
+
+    def log(self, msg='', level='info', output=False, save=False):
+        logger = {
+            'debug'     : logging.debug(msg),
+            'info'      : logging.info(msg),
+            'warning'   : logging.warning(msg),
+            'error'     : logging.error(msg),
+            'critical'  : logging.critical(msg)
+        }
+        if output:
+            logger.get(level, logging.debug('unable to log - check syntax'))()
 
 
 # https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
