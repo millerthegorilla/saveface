@@ -107,9 +107,9 @@ class SaveFaceFormatterXML(SaveFaceFormatterJSON):
 
     @property
     def template(self):
-        return self._template.format(HTMLBeautifier.beautify(html.unescape(ET.tostring(self._xml,
+        return self._template.format(ET.tostring(self._xml,
                                                    encoding='unicode',
-                                                   method='html')), 4))
+                                                   method='xml'))
 
     @template.setter
     def template(self, val):
@@ -142,9 +142,9 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
 
     @property
     def template(self):
-        return self._template.format(HTMLBeautifier.beautify(html.unescape(ET.tostring(self._xml,
+        return self._template.format(ET.tostring(self._xml,
                                                    encoding='unicode',
-                                                   method='html')), 4))
+                                                   method='html'))
 
     @template.setter
     def template(self, val):
@@ -179,15 +179,15 @@ def xmlformat(xmltree):
         for e in p:
             e.remove(e.find('./paging'))
 
-    for i in xmltree.iterfind('.//message/.'):
-        # if i.text.find('gales.me') != -1:
-        #     i.text.replace('<james@gales.me','\<james[@]gales.me\>')
-
-        i.text = re.sub(
-            '<([^>]+)>',
-            repl_func,
-            i.text,
-            flags=re.IGNORECASE)
+    # for i in xmltree.iterfind('.//message/.'):
+    #     # if i.text.find('gales.me') != -1:
+    #     #     i.text.replace('<james@gales.me','\<james[@]gales.me\>')
+    #     if i.text is not None:
+    #         i.text = re.sub(
+    #             '<([^>]+)>',
+    #             repl_func,
+    #             i.text,
+    #             flags=re.IGNORECASE)
 
     return xmltree
 

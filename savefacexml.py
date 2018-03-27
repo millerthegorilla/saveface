@@ -18,15 +18,25 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
 from savefacejson import SaveFaceJSON
 from xml.etree import ElementTree as ET  # should have used lxml
 import html5lib
 from dicttoxml import dicttoxml
-from bs4 import BeautifulSoup as bs
+# from bs4 import BeautifulSoup as bs
 import re
 import html
+import time
+import gc
+import unicodedata
+import itertools
+from collections.abc import Sequence
 
+
+# class ControlCodes(Sequence):
+#     def __init__():
+        
+#     def index(self, value, start, stop):
+#         return 
 
 class SaveFaceXML(SaveFaceJSON):
 
@@ -35,11 +45,8 @@ class SaveFaceXML(SaveFaceJSON):
         self.formatter = formatter
         self.xml_data = []
 
-    def get_pages_from_graph(self, graph=None, number_of_pages=None,
-                             request_string=None, verbose=True):
-        super().get_pages_from_graph(graph,
-                                     number_of_pages,
-                                     request_string,
+    def get_pages_from_graph(self, number_of_pages=None, verbose=True):
+        super().get_pages_from_graph(number_of_pages,
                                      verbose)
 
     def get_pages_from_pickle(self, pickle_file):
@@ -47,27 +54,50 @@ class SaveFaceXML(SaveFaceJSON):
 
     def get_data_from_pages(self):
         super().get_data_from_pages()
+
+        def repl_func(x):
+            return '<![CDATA[' + x.group(0) + ']]>'
+
+        def remove_control_characters(m):
+            return "".join(ch for ch in m.group(0) if unicodedata.category(ch)[0] != "C")
+
+        def containsAny(seq, aset):
+            for item in itertools.ifilter(aset.__contains__, seq):
+                return True
+            return False
+
         for data in self.json_data:
             try:
-                self.xml_data.append(
-                    html5lib.parseFragment(dicttoxml(data,
-                                           attr_type=False,
-                                           custom_root='item',
-                                           root=False).decode('utf-8'),
-                                           namespaceHTMLElements=False))
-
+                el = html5lib.parse(dicttoxml(data,
+                                              attr_type=False,
+                                              custom_root='item',
+                                              root=False).decode(self.encoding),
+                                    namespaceHTMLElements=False)
+                self.xml_data.append(el)
+                el = None
                 try:
-                    m = self.xml_data[-1].find('./message/.').text
-                    m = html.unescape(m)
-                    # m = re.sub(r'[\x00-\x1F]',
-                    #            lambda x: '<![CDATA[' + x.string + ']]', m)
-                    # m = re.sub(r'<(.)*?>',
-                    #            lambda x: '<![CDATA[' + x.string + ']]', m)
+                    for m in self.xml_data[-1].findall('.//message/.'):
+                        m.text = html.unescape(m.text)
+                        # control codes
+                        m.text = re.sub(r'[\x00-\x19]',  # [\x7F]',
+                                        remove_control_characters,
+                                        m.text)
+                        # dud elements
+                        if '<' in m.text:
+                            m.text = re.sub(r'(<.*>)',
+                                            repl_func,
+                                            m.text,
+                                            flags=re.IGNORECASE)
+
                     self.print_progress(len(self.xml_data), len(self.json_data), 'Constructing XML...')
-                except KeyError as e:
-                    self.log(msg=e, level='info', output=False)
+                except (TypeError, KeyError, Exception) as e:
+                    self.log(msg=e, level='info', std_out=False, to_disk=True)
+                    pass
             except (ET.ParseError, AttributeError) as e:
                 print(e)
+                pass
+        self.json_data = None
+        gc.collect()
 
     @property
     def xml(self):
@@ -110,8 +140,22 @@ class SaveFaceXML(SaveFaceJSON):
         elements = elements + els
         self.__download_(elements)
 
-    def embed_file_paths():
-        pass  # TODO
+    def indent(self, elem, level=0):
+        time.sleep(0.001)
+        gc.collect()
+        i = "\n" + level * "  "
+        if len(elem):
+            if not elem.text or not elem.text.strip():
+                elem.text = i + "  "
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = i
+            for elem in elem:
+                self.indent(elem, level + 1)
+            if not elem.tail or not elem.tail.strip():
+                elem.tail = i
+        else:
+            if level and (not elem.tail or not elem.tail.strip()):
+                elem.tail = i
 
     def __str__(self):
-        return bs(ET.tostring(self.xml), "html.parser").prettify()
+        return self.indent(self.formatter.template, 8)

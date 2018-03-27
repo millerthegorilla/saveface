@@ -28,6 +28,7 @@ from facepy import exceptions as fpexceptions
 from pathlib import Path
 from saveface import SaveFace
 from saveface import pretty_search
+from saveface import dict_extract  # TODO review these funcs
 
 
 class SaveFaceJSON(SaveFace):
@@ -62,8 +63,8 @@ class SaveFaceJSON(SaveFace):
         self._img_folder = 'images'
 
         # public variables
+        self.encoding = 'UTF-8'
         self.request_string = ''
-        self.O_Auth_tkn = ''
         self.filename = ''
         self.filepath = ''
         self.pages = []  # the result dictionary
@@ -77,7 +78,7 @@ class SaveFaceJSON(SaveFace):
         return self.formatter.json
 
     # graph functions
-    def init_graph(self):
+    def init_graph(self, O_Auth_tkn):
         """
             set the internal graph object
         Args:
@@ -87,11 +88,11 @@ class SaveFaceJSON(SaveFace):
         Raises:
             ValueError: Description
         """
-        super().init_graph()
+        super().init_graph(O_Auth_tkn)
 
-        if self.O_Auth_tkn is not None:
+        if O_Auth_tkn is not None:
             try:
-                graph = GraphAPI(self.O_Auth_tkn)
+                graph = GraphAPI(O_Auth_tkn)
             except (fpexceptions.OAuthError, fpexceptions.HTTPError) as e:
                 print(type(e))
                 print(e.args)
@@ -115,7 +116,7 @@ class SaveFaceJSON(SaveFace):
             fpexceptions.FacepyError:
                facepy request errors
         """
-        super().get_page_from_graph(request_string)
+        super().get_page_from_graph()
 
         if self._graph is None:
             raise ValueError("graph must be initialised")
@@ -124,27 +125,32 @@ class SaveFaceJSON(SaveFace):
             raise ValueError("request_string must be defined")
 
         try:
-            return self._graph.get(request_string)
+            return self._graph.get(self.request_string)
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
                 fpexceptions.FacepyError) as e:
             raise e
 
-    def request_page_from_graph(self, request_string=None):
-        super().request_page_from_graph(request_string, verbose)
+    def request_page_from_graph(self, request_url):
+        super().request_page_from_graph(request_url)
 
-        if request_string is None:
+        if request_url is None:
             raise ValueError("request_string must be defined")
 
         try:
-            return requests.get(request_string).encoding('utf-8').json()
-        except (fpexceptions.OAuthError,
-                fpexceptions.FacebookError,
-                fpexceptions.FacepyError) as e:
-            raise e
+            r = requests.get(request_url)
+            import pdb; pdb.set_trace()  # breakpoint df2fcfa5 //
+            self.encoding = str(r.encoding)
+            return r.json()
+        except (requests.exceptions.RequestException,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.HTTPError,
+                requests.exceptions.URLRequired,
+                requests.exceptions.Timeout) as e:
+            self.log(msg=(e), exception=e)
 
-    def get_pages_from_graph(self, graph=None, number_of_pages=None,
-                             request_string=None, verbose=True):
+    def get_pages_from_graph(self, number_of_pages=None,
+                             verbose=True):
         """
         Populates a list of dicts representing pages of stored
                     in an array from facebook
@@ -167,19 +173,20 @@ class SaveFaceJSON(SaveFace):
         Returns:
             array: array of dicts that are pages
         """
-        super().get_pages_from_graph(graph,
-                                     number_of_pages,
+        super().get_pages_from_graph(number_of_pages,
                                      verbose)
 
+        if self.request_string is None or self.request_string == '':
+            raise ValueError(type(self).__name__ +
+                             "request_string must not be empty")
         num_pages = 0
-        pages = []
         found = False
-        pages.append(self.get_page_from_graph(request_string))
+        self.pages.append(self.get_page_from_graph())
         try:
             while True:
-                for np in self.dict_extract('next', pages[-1]):
+                for np in dict_extract('next', pages[-1]):
                     found = True
-                    pages.append(self.request_page_from_graph(np))
+                    self.pages.append(self.request_page_from_graph(np))
                     num_pages = num_pages + 1
                 if found:
                     found = False
@@ -187,10 +194,8 @@ class SaveFaceJSON(SaveFace):
                     break
                 if number_of_pages is not None and num_pages < number_of_pages:
                     break
-
                 if verbose:
-                    print('received \
-                        page number {}   '.format(num_pages), end="\r")
+                    print(f"received page number {num_pages}", end="\r")
 
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
@@ -204,17 +209,17 @@ class SaveFaceJSON(SaveFace):
             print('received {} pages            '
                   .format(num_pages), end='\r')
         self._num_pages = num_pages
-        self.pages = pages[:-1]
+        self.pages.pop()
 
     def get_data_from_pages(self):
         for page in self.pages:
             # TODO :  Here I need to put any top level data that is
             # above the first instance of data
             try:
-                self.json_data = self.json_data + \
-                    pretty_search(page, 'data', True)
-            except AttributeError as e:
-                self.log(e + e.args, 'info')
+                self.json_data = self.json_data +\
+                    next(dict_extract('data', page, True))
+            except (AttributeError, TypeError) as e:
+                self.log(e + e.args, 'info', std_out=False, to_disk=True)
 
     def get_data_as_classes(self):
         class Post:
@@ -243,17 +248,17 @@ class SaveFaceJSON(SaveFace):
             with open('sfdefault', 'wb') as outfile:
                 pickle.dump(pickler, outfile)
 
-    def get_pages_from_pickle(self, pickler=None):
-        if pickler == 'last':
-            pickler = self._last_pickle
-        with open(pickler, 'rb') as infile:
-            self.pages = pickle.load(infile, encoding='utf-8')
+    def get_pages_from_pickle(self, pickle_file=None):
+        if pickle_file == 'last':
+            pickle_file = self._last_pickle
+        with open(pickle_file, 'rb') as infile:
+            self.pages = pickle.load(infile, encoding=self.encoding)
 
     def __get_last_pickle_(self):
         try:
             with open('sfdefault', 'rb') as infile:
                 try:
-                    return pickle.load(infile, encoding='utf-8')
+                    return pickle.load(infile, encoding=self.encoding)
                 except EOFError:
                     return self._default_pickle
         except FileNotFoundError:
