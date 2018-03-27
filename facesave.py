@@ -53,11 +53,13 @@ def process_args(args):
     elif args.format == 'html':
         sf = SaveFaceHTML(sfmt(htmlformat))
 
+    if args.request_string is not None:
+        sf.request_string = args.request_string
     if args.pickle_load_file is not None:
         sf.get_pages_from_pickle(args.pickle_load_file)
     elif args.O_Auth_tkn is not None:
         sf.init_graph(args.O_Auth_tkn)
-        sf.get_pages_from_graph(request_string=args.request_string)
+        sf.get_pages_from_graph()
     else:
         sys.exit("check auth tkn is present")
 

@@ -54,23 +54,16 @@ class SaveFace(ABC):
 
     @abstractmethod
     def request_page_from_graph(self,
-                                request_string=None,
-                                graph=None,
-                                verbose=True):
+                                request_url):
         pass
 
     @abstractmethod
-    def get_page_from_graph(self,
-                            request_string=None,
-                            graph=None,
-                            verbose=True):
+    def get_page_from_graph(self):
         pass
 
     @abstractmethod
     def get_pages_from_graph(self,
-                             graph=None,
                              number_of_pages=None,
-                             request_string=None,
                              verbose=True):
         pass
 
@@ -78,24 +71,29 @@ class SaveFace(ABC):
     def write(self, results, filename, filepath, overwrite=True):
         pass
 
-    def log(self, msg='', level='info', output=False, save=False):
-        logger = {
-            'debug'     : logging.debug(msg),
-            'info'      : logging.info(msg),
-            'warning'   : logging.warning(msg),
-            'error'     : logging.error(msg),
-            'critical'  : logging.critical(msg)
-        }
-        if output:
-            logger.get(level, logging.debug('unable to log - check syntax'))()
+    def log(self, msg='', level='info',
+            exception=None, std_out=False, to_disk=False):
+        log_level = {
+            'debug'     : logging.debug,
+            'info'      : logging.info,
+            'warning'   : logging.warning,
+            'error'     : logging.error,
+            'critical'  : logging.critical
+        }.get(level, logging.debug('unable to log - check syntax'))
+        if exception is not None:
+            raise type(exception)(msg)
+        if std_out is not False:
+            log_level(msg)
 
 
 # https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
-def dict_extract(key, var):
+def dict_extract(key, var, first=False):
     if hasattr(var, 'items'):
         for k, v in var.items():
             if k == key:
                 yield v
+                if first:
+                    raise StopIteration('found')
             if isinstance(v, dict):
                 for result in dict_extract(key, v):
                     yield result
