@@ -1,6 +1,6 @@
 #!/usr/env/bin/ python3
 # Copyright (c) <2018> <James Miller>
-# -*- coding: utf-8 -*-
+
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -101,44 +101,3 @@ def dict_extract(key, var, first=False):
                 for d in v:
                     for result in dict_extract(key, d):
                         yield result
-
-
-# https://stackoverflow.com/questions/8383136/parsing-json-and-searching-through-it
-def pretty_search(dict_or_list, key_to_search, search_for_first_only=False):
-    """
-    Give it a dict or a list of dicts and a dict key (to get values of),
-    it will search through it and all containing dicts and arrays
-    for all values of dict key you gave, and will return you set of them
-    unless you wont specify search_for_first_only=True
-
-    :param dict_or_list:
-    :param key_to_search:
-    :param search_for_first_only:
-    :return:
-    """
-    search_result = set()
-    if isinstance(dict_or_list, dict):
-        for key in dict_or_list:
-            key_value = dict_or_list[key]
-            if key == key_to_search:
-                if search_for_first_only:
-                    return key_value
-                else:
-                    search_result.add(key_value)
-            if isinstance(key_value, dict) or isinstance(key_value, list) or isinstance(key_value, set):
-                _search_result = pretty_search(key_value, key_to_search, search_for_first_only)
-                if _search_result and search_for_first_only:
-                    return _search_result
-                elif _search_result:
-                    for result in _search_result:
-                        search_result.add(result)
-    elif isinstance(dict_or_list, list) or isinstance(dict_or_list, set):
-        for element in dict_or_list:
-            if isinstance(element, list) or isinstance(element, set) or isinstance(element, dict):
-                _search_result = pretty_search(element, key_to_search, search_result)
-                if _search_result and search_for_first_only:
-                    return _search_result
-                elif _search_result:
-                    for result in _search_result:
-                        search_result.add(result)
-    return search_result if search_result else None

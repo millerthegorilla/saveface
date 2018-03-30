@@ -105,13 +105,14 @@ table {
 }
 
 .content .message, .content .story {
-	display: flex;
+	display: inline-block;
 	flex-direction: row;
 	justify-content: flex-start;
 	padding: 10px;
 	border: solid 5px;
 	border-color: white;
 	background: skyblue;
+	white-space: pre-line;
 }
 
 .content .full_picture {

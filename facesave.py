@@ -1,6 +1,5 @@
 #!/usr/env/bin/ python3
 # Copyright (c) <2018> <James Miller>
-# -*- coding: utf-8 -*-
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -59,20 +58,23 @@ def process_args(args):
         sf.get_pages_from_pickle(args.pickle_load_file)
     elif args.O_Auth_tkn is not None:
         sf.init_graph(args.O_Auth_tkn)
-        sf.get_pages_from_graph()
+        sf.get_pages_from_graph(number_of_pages = 3)
     else:
         sys.exit("check auth tkn is present")
 
     if args.format == 'html':
         sf.get_data_from_pages()
+        sf.formatter.format(sf.xml_data)
+        if args.stdout:
+            print(sf.html)
     if args.format == 'xml':
         sf.get_data_from_pages()
         sf.formatter.format(sf.xml_data)
+        if args.stdout:
+            print(str(sf))
         if args.pickle_save_file is not None:
             sf.save_pages_to_pickle(args.pickle_save_file)
 
-    if args.stdout:
-        print(sf.formatter.template)
     if args.filename is not None:
         sf.write(args.filename, args.filepath)
 

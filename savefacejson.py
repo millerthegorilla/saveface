@@ -1,6 +1,5 @@
 #!/usr/env/bin/ python3
 # Copyright (c) <2018> <James Miller>
-# -*- coding: utf-8 -*-
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -20,15 +19,18 @@
 # SOFTWARE.
 import json
 import pickle
-import sys
 import requests
 from time import strftime
 from facepy import GraphAPI
 from facepy import exceptions as fpexceptions
 from pathlib import Path
 from saveface import SaveFace
-from saveface import pretty_search
-from saveface import dict_extract  # TODO review these funcs
+from saveface import dict_extract
+import fcntl
+import termios
+import struct
+import ast
+import sys
 
 
 class SaveFaceJSON(SaveFace):
@@ -139,9 +141,11 @@ class SaveFaceJSON(SaveFace):
 
         try:
             r = requests.get(request_url)
-            import pdb; pdb.set_trace()  # breakpoint df2fcfa5 //
+
             self.encoding = str(r.encoding)
-            return r.json()
+            s = r.json()
+            r.close()
+            return s
         except (requests.exceptions.RequestException,
                 requests.exceptions.ConnectionError,
                 requests.exceptions.HTTPError,
@@ -184,7 +188,7 @@ class SaveFaceJSON(SaveFace):
         self.pages.append(self.get_page_from_graph())
         try:
             while True:
-                for np in dict_extract('next', pages[-1]):
+                for np in dict_extract('next', self.pages[-1]):
                     found = True
                     self.pages.append(self.request_page_from_graph(np))
                     num_pages = num_pages + 1
@@ -192,7 +196,7 @@ class SaveFaceJSON(SaveFace):
                     found = False
                 else:
                     break
-                if number_of_pages is not None and num_pages < number_of_pages:
+                if number_of_pages is not None and number_of_pages < num_pages:
                     break
                 if verbose:
                     print(f"received page number {num_pages}", end="\r")
@@ -295,7 +299,6 @@ class SaveFaceJSON(SaveFace):
         bar_length(Int)- Optional : character length of bar
         """
         def terminal_size():
-            import fcntl, termios, struct
             th, tw, hp, wp = struct.unpack('HHHH',
                 fcntl.ioctl(0, termios.TIOCGWINSZ,
                 struct.pack('HHHH', 0, 0, 0, 0)))

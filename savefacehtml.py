@@ -1,6 +1,5 @@
 #!/usr/env/bin/ python3
 # Copyright (c) <2018> <James Miller>
-# -*- coding: utf-8 -*-
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -19,17 +18,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 from savefacexml import SaveFaceXML
+import io
 
 
 class SaveFaceHTML(SaveFaceXML):
 
     def __init__(self, formatter=None):
         super().__init__(formatter)
-        self._html = ''
 
     def get_pages_from_pickle(self, pickle_file):
         super().get_pages_from_pickle(pickle_file)
-        return self.pages
 
     def get_data_from_graph(self, graph=None, number_of_pages=None,
                             request_string=None, verbose=True):
@@ -37,16 +35,13 @@ class SaveFaceHTML(SaveFaceXML):
                                      number_of_pages=number_of_pages,
                                      request_string=request_string,
                                      verbose=verbose)
-        return self.data
 
     def get_data_from_pages(self):
         super().get_data_from_pages()
-        return self.data
 
     def get_data_from_pickle(self):
         self.get_pages_from_pickle()
         self.get_data_from_pages()
-        return self.data
 
     @property
     def html(self):
@@ -63,7 +58,7 @@ class SaveFaceHTML(SaveFaceXML):
         """
         # super().write(filename, filepath, 'html', overwrite)
         with open(filepath + filename, 'w') as output:
-            output.write(bs(self.html, "html.parser").prettify(formatter=None))
+            output.write(self.html)
 
     def __str__(self):
-        return bs(self.html, "html.parser").prettify()
+        return self.formatter.html

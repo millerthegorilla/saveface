@@ -1,6 +1,5 @@
 #!/usr/env/bin/ python3
 # Copyright (c) <2018> <James Miller>
-# -*- coding: utf-8 -*-
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -22,21 +21,13 @@ from savefacejson import SaveFaceJSON
 from xml.etree import ElementTree as ET  # should have used lxml
 import html5lib
 from dicttoxml import dicttoxml
-# from bs4 import BeautifulSoup as bs
 import re
+import unicodedata
+import gc
 import html
 import time
-import gc
-import unicodedata
-import itertools
-from collections.abc import Sequence
+import io
 
-
-# class ControlCodes(Sequence):
-#     def __init__():
-        
-#     def index(self, value, start, stop):
-#         return 
 
 class SaveFaceXML(SaveFaceJSON):
 
@@ -62,40 +53,43 @@ class SaveFaceXML(SaveFaceJSON):
             return "".join(ch for ch in m.group(0) if unicodedata.category(ch)[0] != "C")
 
         def containsAny(seq, aset):
-            for item in itertools.ifilter(aset.__contains__, seq):
+            for item in filter(aset.__contains__, seq):
                 return True
             return False
 
         for data in self.json_data:
             try:
-                el = html5lib.parse(dicttoxml(data,
-                                              attr_type=False,
-                                              custom_root='item',
-                                              root=False).decode(self.encoding),
-                                    namespaceHTMLElements=False)
+                el = html5lib.parseFragment(dicttoxml(data,
+                                            attr_type=False,
+                                            custom_root='item',
+                                            root=False),
+                                            namespaceHTMLElements=False)
                 self.xml_data.append(el)
                 el = None
                 try:
                     for m in self.xml_data[-1].findall('.//message/.'):
-                        m.text = html.unescape(m.text)
+                        if 'â€™' in m.text:
+                            m.text = m.text.encode('windows-1252', errors='xmlcharrefreplace').decode('windows-1252', errors='xmlcharrefreplace')
+                        m.text = m.text.encode('utf-8', errors='xmlcharrefreplace').decode()
+                        #m.text = html.escape(m.text)
+                        # m.text = re.sub(r'[\x00-\x19]![\x09-\x15]',  # [\x7F]',
+                        #                 remove_control_characters,
+                        #                 m.text)
                         # control codes
-                        m.text = re.sub(r'[\x00-\x19]',  # [\x7F]',
-                                        remove_control_characters,
-                                        m.text)
                         # dud elements
-                        if '<' in m.text:
-                            m.text = re.sub(r'(<.*>)',
-                                            repl_func,
-                                            m.text,
-                                            flags=re.IGNORECASE)
-
-                    self.print_progress(len(self.xml_data), len(self.json_data), 'Constructing XML...')
-                except (TypeError, KeyError, Exception) as e:
+                        # if '<' in m.text:
+                        #     m.text = re.sub(r'(<.*>)',
+                        #                     repl_func,
+                        #                     m.text,
+                        #                     flags=re.IGNORECASE)
+                    time.sleep(0.05)
+                except (TypeError, KeyError) as e:
                     self.log(msg=e, level='info', std_out=False, to_disk=True)
-                    pass
+
             except (ET.ParseError, AttributeError) as e:
                 print(e)
-                pass
+
+            self.print_progress(len(self.xml_data), len(self.json_data), 'Constructing XML...')
         self.json_data = None
         gc.collect()
 
@@ -113,7 +107,13 @@ class SaveFaceXML(SaveFaceJSON):
         super().write(filename, filepath, overwrite)
         try:
             with open(filename, 'w') as output:
-                output.write(self.formatter.template)
+                output.write(str(self.formatter))
+                # ET.ElementTree(self.xml).write(output,
+                #                                encoding="unicode",
+                #                                xml_declaration=None,
+                #                                default_namespace=None,
+                #                                method="xml",
+                #                                short_empty_elements=False)
         except IOError as e:
             print(type(e))
             print(e.args)
@@ -140,22 +140,5 @@ class SaveFaceXML(SaveFaceJSON):
         elements = elements + els
         self.__download_(elements)
 
-    def indent(self, elem, level=0):
-        time.sleep(0.001)
-        gc.collect()
-        i = "\n" + level * "  "
-        if len(elem):
-            if not elem.text or not elem.text.strip():
-                elem.text = i + "  "
-            if not elem.tail or not elem.tail.strip():
-                elem.tail = i
-            for elem in elem:
-                self.indent(elem, level + 1)
-            if not elem.tail or not elem.tail.strip():
-                elem.tail = i
-        else:
-            if level and (not elem.tail or not elem.tail.strip()):
-                elem.tail = i
-
     def __str__(self):
-        return self.indent(self.formatter.template, 8)
+        return str(self.formatter)
