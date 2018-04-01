@@ -22,17 +22,14 @@ from xml.etree import ElementTree as ET  # should have used lxml
 import html5lib
 from dicttoxml import dicttoxml
 import re
-import unicodedata
 import gc
-import html
 import time
-import io
 
 
 class SaveFaceXML(SaveFaceJSON):
 
     def __init__(self, formatter=None):
-        super().__init__(formatter=None)
+        super().__init__(formatter)
         self.formatter = formatter
         self.xml_data = []
 
@@ -46,17 +43,6 @@ class SaveFaceXML(SaveFaceJSON):
     def get_data_from_pages(self):
         super().get_data_from_pages()
 
-        def repl_func(x):
-            return '<![CDATA[' + x.group(0) + ']]>'
-
-        def remove_control_characters(m):
-            return "".join(ch for ch in m.group(0) if unicodedata.category(ch)[0] != "C")
-
-        def containsAny(seq, aset):
-            for item in filter(aset.__contains__, seq):
-                return True
-            return False
-
         for data in self.json_data:
             try:
                 el = html5lib.parseFragment(dicttoxml(data,
@@ -66,26 +52,7 @@ class SaveFaceXML(SaveFaceJSON):
                                             namespaceHTMLElements=False)
                 self.xml_data.append(el)
                 el = None
-                try:
-                    for m in self.xml_data[-1].findall('.//message/.'):
-                        if 'â€™' in m.text:
-                            m.text = m.text.encode('windows-1252', errors='xmlcharrefreplace').decode('windows-1252', errors='xmlcharrefreplace')
-                        m.text = m.text.encode('utf-8', errors='xmlcharrefreplace').decode()
-                        #m.text = html.escape(m.text)
-                        # m.text = re.sub(r'[\x00-\x19]![\x09-\x15]',  # [\x7F]',
-                        #                 remove_control_characters,
-                        #                 m.text)
-                        # control codes
-                        # dud elements
-                        # if '<' in m.text:
-                        #     m.text = re.sub(r'(<.*>)',
-                        #                     repl_func,
-                        #                     m.text,
-                        #                     flags=re.IGNORECASE)
-                    time.sleep(0.05)
-                except (TypeError, KeyError) as e:
-                    self.log(msg=e, level='info', std_out=False, to_disk=True)
-
+                time.sleep(0.05)
             except (ET.ParseError, AttributeError) as e:
                 print(e)
 

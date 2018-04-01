@@ -23,6 +23,8 @@ import re
 import html5lib
 from bs4 import BeautifulSoup as bs
 import html
+import ftfy
+from time import sleep
 
 
 # https://www.python.org/dev/peps/pep-3119
@@ -130,12 +132,20 @@ class SaveFaceFormatterXML(SaveFaceFormatterJSON):
                 items_rt = ET.XML('<item></item>')
                 for el in item:
                     items_rt.append(el)
+                    if el.tag == 'attachment':
+                        self.media_proc(el)
                 rn.append(items_rt)
+        for el in rn.iter():
+            if el.text:
+                el.text = ftfy.fix_text_segment(el.text, fix_entities='auto', remove_terminal_escapes=True, fix_encoding=True, fix_latin_ligatures=True, fix_character_width=True, uncurl_quotes=True, fix_line_breaks=True, fix_surrogates=True, remove_control_chars=True, remove_bom=True, normalization='NFKC')
         if self._formatter_func is not None:
             self._xml = self._formatter_func(self._xml)
 
+    def media_proc(self, item):
+        pass
+
     def __str__(self):
-        return self.template.format(bs(ET.tostring(self._xml, method='xml').decode()).content.prettify())
+        return self.template.format(bs(ET.tostring(self._xml, method='xml').decode(), 'html.parser').content.prettify())
 
 
 # this can be subclassed for different request strings
@@ -237,12 +247,16 @@ def htmlformat(xmltree):
 
     for i in xmltree.findall('.//items/.'):
         e = ET.Element('p', attrib={'class': 'posts-title'})
-        e.text = '<strong>Posts</strong>'
+        inner = ET.Element('strong')
+        inner.text = "Posts"
+        e.append(inner)
         i.insert(0, e)
 
     for i in xmltree.findall('.//comments/.'):
         e = ET.Element('p', attrib={'class': 'comments-title'})
-        e.text = '<strong>Comments</strong>'
+        inner = ET.Element('strong')
+        inner.text = "Comments"
+        e.append(inner)
         i.insert(0, e)
 
     if xmltree.findall('.//photos/.'):
@@ -273,13 +287,13 @@ def htmlformat(xmltree):
         i.append(e)
         i.text = None
 
-    p = xmltree.findall('.//picture')
-    fp = xmltree.findall('.//full_picture')
-    fpp = p + fp
-    for el in fpp:
-        el.insert(0, ET.Element('img', attrib={'class': 'image',
-                                               'src': el.text}))
-        el.text = None
+    # p = xmltree.findall('.//picture')
+    # fp = xmltree.findall('.//full_picture')
+    # fpp = p + fp
+    # for el in fpp:
+    #     el.insert(0, ET.Element('img', attrib={'class': 'image',
+    #                                            'src': el.text}))
+    #     el.text = None
 
     for el in xmltree.findall('.//created_time'):
         el.tag = 'a'
@@ -291,3 +305,17 @@ def htmlformat(xmltree):
             el.tag = 'div'
 
     return xmltree
+
+
+def re_cdata(x):
+    return '<![CDATA[' + x.group(0) + ']]>'
+
+
+def re_remove_control_characters(m):
+    return "".join(ch for ch in m.group(0) if unicodedata.category(ch)[0] != "C")
+
+
+def containsAny(seq, aset):
+    for item in filter(aset.__contains__, seq):
+        return True
+    return False

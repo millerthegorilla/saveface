@@ -19,6 +19,7 @@
 # SOFTWARE.
 import sys
 from savefacexml import SaveFaceXML
+from savefacexhtml import SaveFaceXHTML
 from savefacehtml import SaveFaceHTML
 from savefacejson import SaveFaceJSON
 from savefaceformatter import SaveFaceFormatterHTML as sfmt
@@ -39,6 +40,8 @@ def process_args(args):
         ValueError: if O_Auth_tkn is not set
     """
     sf = None
+    if args.format == 'xhtml':
+        sf = SaveFaceXHTML(xfmt(xmlformat))
     if args.format == 'xml':
         sf = SaveFaceXML(xfmt(xmlformat))
     elif args.format == 'json':
@@ -58,7 +61,7 @@ def process_args(args):
         sf.get_pages_from_pickle(args.pickle_load_file)
     elif args.O_Auth_tkn is not None:
         sf.init_graph(args.O_Auth_tkn)
-        sf.get_pages_from_graph(number_of_pages = 3)
+        sf.get_pages_from_graph(5)
     else:
         sys.exit("check auth tkn is present")
 
@@ -66,7 +69,7 @@ def process_args(args):
         sf.get_data_from_pages()
         sf.formatter.format(sf.xml_data)
         if args.stdout:
-            print(sf.html)
+            print(str(sf))
     if args.format == 'xml':
         sf.get_data_from_pages()
         sf.formatter.format(sf.xml_data)
@@ -164,7 +167,7 @@ if __name__ == "__main__":
                                               pjson (prettyprinted), \
                                               xml or html. \
                                               Defaults to json',
-                        choices=['json', 'pjson', 'xml', 'html'],
+                        choices=['json', 'pjson', 'xml', 'html', 'xhtml'],
                         dest='format')
     parser.add_argument('-o', '--stdout',
                         metavar='output to stdout',

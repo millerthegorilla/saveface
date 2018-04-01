@@ -93,7 +93,7 @@ def dict_extract(key, var, first=False):
             if k == key:
                 yield v
                 if first:
-                    raise StopIteration('found')
+                    break
             if isinstance(v, dict):
                 for result in dict_extract(key, v):
                     yield result

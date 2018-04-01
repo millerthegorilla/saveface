@@ -60,7 +60,9 @@ table {
   font-family: 'Inconsolata';
   src: url('Inconsolata-Regular.ttf');
 }
-
+strong {
+	display: inline-block;
+}
 .content {
 	display: flex;
 	flex-direction: column;

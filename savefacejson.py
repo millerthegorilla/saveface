@@ -21,6 +21,7 @@ import json
 import pickle
 import requests
 from time import strftime
+from time import sleep
 from facepy import GraphAPI
 from facepy import exceptions as fpexceptions
 from pathlib import Path
@@ -51,7 +52,7 @@ class SaveFaceJSON(SaveFace):
         super().__init__(formatter)
 
         # private
-        self._num_pages = 0
+        self._num_pages_rcvd = 0
         self._num_images = 0
         self._images_total = 0
         self._imgpath_element = []
@@ -65,6 +66,7 @@ class SaveFaceJSON(SaveFace):
         self._img_folder = 'images'
 
         # public variables
+        self.verbose = True
         self.encoding = 'UTF-8'
         self.request_string = ''
         self.filename = ''
@@ -141,17 +143,20 @@ class SaveFaceJSON(SaveFace):
 
         try:
             r = requests.get(request_url)
-
-            self.encoding = str(r.encoding)
+            self._num_pages_rcvd += 1
+            r.encoding = 'UTF-8'
             s = r.json()
             r.close()
+            if self.verbose:
+                print(f"received page number {self._num_pages_rcvd}", end="\r")
             return s
         except (requests.exceptions.RequestException,
                 requests.exceptions.ConnectionError,
                 requests.exceptions.HTTPError,
                 requests.exceptions.URLRequired,
-                requests.exceptions.Timeout) as e:
-            self.log(msg=(e), exception=e)
+                requests.exceptions.Timeout,
+                Exception) as e:
+            self.log(msg=(e), exception=e, std_out=True)
 
     def get_pages_from_graph(self, number_of_pages=None,
                              verbose=True):
@@ -183,24 +188,19 @@ class SaveFaceJSON(SaveFace):
         if self.request_string is None or self.request_string == '':
             raise ValueError(type(self).__name__ +
                              "request_string must not be empty")
-        num_pages = 0
-        found = False
+        # found = False
         self.pages.append(self.get_page_from_graph())
         try:
-            while True:
-                for np in dict_extract('next', self.pages[-1]):
-                    found = True
-                    self.pages.append(self.request_page_from_graph(np))
-                    num_pages = num_pages + 1
-                if found:
-                    found = False
-                else:
+            for np in dict_extract('next', self.pages[-1]):
+            #    found = True
+                self.pages.append(self.request_page_from_graph(np))
+            # if found:
+            #     found = False
+            # else:
+            #     break
+                if number_of_pages is not None and number_of_pages < self._num_pages_rcvd:
                     break
-                if number_of_pages is not None and number_of_pages < num_pages:
-                    break
-                if verbose:
-                    print(f"received page number {num_pages}", end="\r")
-
+                sleep(0.15)
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
                 fpexceptions.FacepyError,
@@ -211,8 +211,7 @@ class SaveFaceJSON(SaveFace):
 
         if verbose:
             print('received {} pages            '
-                  .format(num_pages), end='\r')
-        self._num_pages = num_pages
+                  .format(self._num_pages_rcvd), end='\r')
         self.pages.pop()
 
     def get_data_from_pages(self):
@@ -224,6 +223,7 @@ class SaveFaceJSON(SaveFace):
                     next(dict_extract('data', page, True))
             except (AttributeError, TypeError) as e:
                 self.log(e + e.args, 'info', std_out=False, to_disk=True)
+        return
 
     def get_data_as_classes(self):
         class Post:
