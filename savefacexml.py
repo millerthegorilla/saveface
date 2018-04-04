@@ -34,8 +34,7 @@ class SaveFaceXML(SaveFaceJSON):
         self.xml_data = []
 
     def get_pages_from_graph(self, number_of_pages=None, verbose=True):
-        super().get_pages_from_graph(number_of_pages,
-                                     verbose)
+        super().get_pages_from_graph(number_of_pages, verbose)
 
     def get_pages_from_pickle(self, pickle_file):
         super().get_pages_from_pickle(pickle_file)

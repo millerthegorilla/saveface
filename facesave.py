@@ -61,7 +61,7 @@ def process_args(args):
         sf.get_pages_from_pickle(args.pickle_load_file)
     elif args.O_Auth_tkn is not None:
         sf.init_graph(args.O_Auth_tkn)
-        sf.get_pages_from_graph(5)
+        sf.get_pages_from_graph(number_of_pages=args.num_pages)
     else:
         sys.exit("check auth tkn is present")
 
@@ -190,13 +190,29 @@ if __name__ == "__main__":
                                             for the results file. \
                                             Defaults to ./',
                         dest='filepath')
-    parser.add_argument('-p', '--pprint_options',
+    parser.add_argument('-pp', '--pprint_options',
                         metavar='pprint options',
                         type=str, required=False, nargs='*',
                         default='[indent=4, width=80, depth=None]',
                         help="Optional. Options for pprint module.\n\
                               key=value with comma ie -p [indent=4, depth=80]",
                         dest='pprint_opts')
+    parser.add_argument('-c', '--css',
+                        metavar='css filename',
+                        type=str, required=False, nargs='?',
+                        default='saveface.css', help='Optional. The filename of the \
+                                                css file.\
+                                                Defaults to saveface.css',
+                        dest='cssfile')
+    parser.add_argument('-p', '--numofpages',
+                        metavar='number of pages',
+                        type=int, required=False, nargs='?',
+                        default=None, help='Optional. The number of pages \
+                                                to download.\
+                                                If not present, all pages \
+                                                listed in pagination are \
+                                                downloaded.',
+                        dest='num_pages')
     # parser.add_argument('-i', '--images',
     #                     metavar='download images?',
     #                     type=bool, required=False, nargs='?',
@@ -211,13 +227,6 @@ if __name__ == "__main__":
     #                                             images folder.\
     #                                             Defaults to ./images',
     #                     dest='img_folder')
-    parser.add_argument('-c', '--css',
-                        metavar='css filename',
-                        type=str, required=False, nargs='?',
-                        default='saveface.css', help='Optional. The filename of the \
-                                                css file.\
-                                                Defaults to saveface.css',
-                        dest='cssfile')
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)

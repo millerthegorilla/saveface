@@ -122,14 +122,10 @@ class SaveFaceJSON(SaveFace):
         """
         super().get_page_from_graph()
 
-        if self._graph is None:
-            raise ValueError("graph must be initialised")
-
-        if self.request_string is None:
-            raise ValueError("request_string must be defined")
+        
 
         try:
-            return self._graph.get(self.request_string)
+            return next()
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
                 fpexceptions.FacepyError) as e:
@@ -184,31 +180,35 @@ class SaveFaceJSON(SaveFace):
         """
         super().get_pages_from_graph(number_of_pages,
                                      verbose)
+        if self._graph is None:
+            raise ValueError("graph must be initialised")
 
         if self.request_string is None or self.request_string == '':
             raise ValueError(type(self).__name__ +
                              "request_string must not be empty")
         # found = False
-        self.pages.append(self.get_page_from_graph())
         try:
-            for np in dict_extract('next', self.pages[-1]):
-            #    found = True
-                self.pages.append(self.request_page_from_graph(np))
-            # if found:
-            #     found = False
-            # else:
-            #     break
-                if number_of_pages is not None and number_of_pages < self._num_pages_rcvd:
-                    break
-                sleep(0.15)
+            for page in self._graph.get(self.request_string, True):
+                self.pages.append(page)
+                self._num_pages_rcvd = len(self.pages)
+                if self.verbose:
+                    print(f"received page number {self._num_pages_rcvd}", end="\r")
+                if number_of_pages is not None and number_of_pages < self._num_pages_rcvd + 1:
+                    raise StopIteration
+            # np = dict_extract('next', self.pages[-1], True)
+            # if np:
+            #     self.pages.append(self.request_page_from_graph(np))
+            # sleep(0.15)
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
                 fpexceptions.FacepyError,
                 KeyError) as e:
-            print(type(e))
-            print(e.args)
-            print(e)
-
+            self.log(str(e),
+                     level='warning',
+                     exception=e,
+                     std_out=True)
+        except StopIteration:
+            pass
         if verbose:
             print('received {} pages            '
                   .format(self._num_pages_rcvd), end='\r')
