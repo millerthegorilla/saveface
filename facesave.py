@@ -53,30 +53,38 @@ def process_args(args):
                           width=args.pprint_opts['width'],
                           depth=args.pprint_opts['depth'])
     elif args.format == 'html':
-        sf = SaveFaceHTML(sfmt(htmlformat))
-
+        if args.O_Auth_tkn is None:
+            print('** Many pictures will not be shown without a valid Auth Tkn **')
+        sf = SaveFaceHTML()
     if args.request_string is not None:
         sf.request_string = args.request_string
     if args.pickle_load_file is not None:
+        if args.O_Auth_tkn is not None:
+            sf.init_graph(args.O_Auth_tkn)
         sf.get_pages_from_pickle(args.pickle_load_file)
-    elif args.O_Auth_tkn is not None:
-        sf.init_graph(args.O_Auth_tkn)
-        sf.get_pages_from_graph(number_of_pages=args.num_pages)
     else:
-        sys.exit("check auth tkn is present")
+        if args.O_Auth_tkn is not None:
+            sf.init_graph(args.O_Auth_tkn)
+        else:
+            sys.exit("check auth tkn is present")
+        sf.get_pages_from_graph(number_of_pages=args.num_pages)
 
-    if args.format == 'html':
-        sf.get_data_from_pages()
-        sf.formatter.format(sf.xml_data)
-        if args.stdout:
-            print(str(sf))
-    if args.format == 'xml':
-        sf.get_data_from_pages()
-        sf.formatter.format(sf.xml_data)
-        if args.stdout:
-            print(str(sf))
-        if args.pickle_save_file is not None:
-            sf.save_pages_to_pickle(args.pickle_save_file)
+    if type(sf) is SaveFaceXML:
+        sf.formatter = sfmt(formatter_func=xmlformat,
+                            divs=False,
+                            graph=sf.graph)
+    elif type(sf) is SaveFaceHTML:
+        sf.formatter = sfmt(formatter_func=htmlformat,
+                            divs=True,
+                            graph=sf.graph)
+
+    sf.get_data_from_pages()
+    sf.formatter.format(sf.xml_data)
+    if args.stdout:
+        print(str(sf))
+
+    if args.pickle_save_file is not None:
+        sf.save_pages_to_pickle(args.pickle_save_file)
 
     if args.filename is not None:
         sf.write(args.filename, args.filepath)

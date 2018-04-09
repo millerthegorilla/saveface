@@ -22,8 +22,8 @@ from savefacexml import SaveFaceXML
 
 class SaveFaceHTML(SaveFaceXML):
 
-    def __init__(self, formatter=None):
-        super().__init__(formatter)
+    def __init__(self):
+        super().__init__()
 
     def get_pages_from_pickle(self, pickle_file):
         super().get_pages_from_pickle(pickle_file)
@@ -44,7 +44,7 @@ class SaveFaceHTML(SaveFaceXML):
 
     @property
     def html(self):
-        return self.formatter.html
+        return self._formatter.html
 
     # todo - add xml_declaration
     def write(self, filename, filepath, overwrite=True):
@@ -60,4 +60,4 @@ class SaveFaceHTML(SaveFaceXML):
             output.write(self.html)
 
     def __str__(self):
-        return self.formatter.html
+        return self._formatter.html

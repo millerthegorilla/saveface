@@ -45,25 +45,26 @@ class SaveFaceJSON(SaveFace):
         filename (string): filename to store data in
         O_Auth_tkn (TYPE): Description
     """
-    def __init__(self, formatter=None):
+    def __init__(self):
         """
         initialise class variables
         """
-        super().__init__(formatter)
+        super().__init__()
 
         # private
         self._num_pages_rcvd = 0
         self._num_images = 0
         self._images_total = 0
         self._imgpath_element = []
+        self._graph = None
+        self._formatter = None
+        self._img_folder = 'images'
 
         # pprint options
         self._compact = False
         self._indent = 4
         self._depth = None
         self._width = 80
-        self._graph = None
-        self._img_folder = 'images'
 
         # public variables
         self.verbose = True
@@ -80,6 +81,18 @@ class SaveFaceJSON(SaveFace):
     @property
     def json(self):
         return self.formatter.json
+
+    @property
+    def formatter(self):
+        return self._formatter
+
+    @formatter.setter
+    def formatter(self, formatter):
+        self._formatter = formatter
+
+    @property
+    def graph(self):
+        return self._graph
 
     # graph functions
     def init_graph(self, O_Auth_tkn):
@@ -121,9 +134,6 @@ class SaveFaceJSON(SaveFace):
                facepy request errors
         """
         super().get_page_from_graph()
-
-        
-
         try:
             return next()
         except (fpexceptions.OAuthError,
@@ -157,19 +167,8 @@ class SaveFaceJSON(SaveFace):
     def get_pages_from_graph(self, number_of_pages=None,
                              verbose=True):
         """
-        Populates a list of dicts representing pages of stored
+        Populates a list of dicts representing pages stored
                     in an array from facebook
-        I wasn't able to get the facepy iterator working, and it
-        may be my knowledge of python rather than the code on github
-        so I will look more at it when I have time.  The code on github
-        returned a generator but it cleaned the request dictionary
-        after each page was returned, so would only succesfully
-        return one page.  If I can't get it working, then I may
-        write a function here that returns a generator for the
-        sake of learning, and also to challenge the practical problem
-        that I have faced generally here, which is to write a general purpose
-        program to handle an unknown json structure and parse it meaningfully
-        into something useful.
         Raises:
             ValueError: Raised if graph is not set is not set
         Args:
@@ -186,7 +185,6 @@ class SaveFaceJSON(SaveFace):
         if self.request_string is None or self.request_string == '':
             raise ValueError(type(self).__name__ +
                              "request_string must not be empty")
-        # found = False
         try:
             for page in self._graph.get(self.request_string, True):
                 self.pages.append(page)
@@ -195,10 +193,6 @@ class SaveFaceJSON(SaveFace):
                     print(f"received page number {self._num_pages_rcvd}", end="\r")
                 if number_of_pages is not None and number_of_pages < self._num_pages_rcvd + 1:
                     raise StopIteration
-            # np = dict_extract('next', self.pages[-1], True)
-            # if np:
-            #     self.pages.append(self.request_page_from_graph(np))
-            # sleep(0.15)
         except (fpexceptions.OAuthError,
                 fpexceptions.FacebookError,
                 fpexceptions.FacepyError,
@@ -207,8 +201,8 @@ class SaveFaceJSON(SaveFace):
                      level='warning',
                      exception=e,
                      std_out=True)
-        except StopIteration:
-            pass
+        # except StopIteration:
+        #     pass
         if verbose:
             print('received {} pages            '
                   .format(self._num_pages_rcvd), end='\r')

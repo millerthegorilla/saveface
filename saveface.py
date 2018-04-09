@@ -45,7 +45,7 @@ class SaveFace(ABC):
     # logic based on the capabilities of the object
     # https://www.python.org/dev/peps/pep-3119/
     @abstractmethod
-    def __init__(self, formatter=None):
+    def __init__(self):
         super().__init__()
 
     @abstractmethod

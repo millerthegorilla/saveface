@@ -28,9 +28,8 @@ import time
 
 class SaveFaceXML(SaveFaceJSON):
 
-    def __init__(self, formatter=None):
-        super().__init__(formatter)
-        self.formatter = formatter
+    def __init__(self):
+        super().__init__()
         self.xml_data = []
 
     def get_pages_from_graph(self, number_of_pages=None, verbose=True):
@@ -61,7 +60,7 @@ class SaveFaceXML(SaveFaceJSON):
 
     @property
     def xml(self):
-        return self.formatter.xml
+        return self._formatter.xml
 
     def write(self, filename, filepath, overwrite=True):
         """
@@ -73,13 +72,7 @@ class SaveFaceXML(SaveFaceJSON):
         super().write(filename, filepath, overwrite)
         try:
             with open(filename, 'w') as output:
-                output.write(str(self.formatter))
-                # ET.ElementTree(self.xml).write(output,
-                #                                encoding="unicode",
-                #                                xml_declaration=None,
-                #                                default_namespace=None,
-                #                                method="xml",
-                #                                short_empty_elements=False)
+                output.write(str(self._formatter))
         except IOError as e:
             print(type(e))
             print(e.args)
@@ -107,4 +100,4 @@ class SaveFaceXML(SaveFaceJSON):
         self.__download_(elements)
 
     def __str__(self):
-        return str(self.formatter)
+        return str(self._formatter)

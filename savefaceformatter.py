@@ -33,6 +33,9 @@ import logging
 import sys
 import os
 from contextlib import suppress
+from facepy import exceptions as fpexceptions
+import requests
+import metadata_parser
 
 
 # https://www.python.org/dev/peps/pep-3119
@@ -89,16 +92,25 @@ default_json_template = u'{}'
 
 default_xml_template = u'<?xml version="1.0" encoding="UTF-8" standalone="yes" ?><root>{}</root>'
 
-default_html_template = u'<!doctype html>' + \
-                        '<html lang=\'en\'>' + \
-                        '<head>' + \
-                        '<meta charset="utf-8"/>' + \
-                        '<link rel="shortcut icon" href="./favicon.ico">' + \
-                        '<link rel="stylesheet"' + \
-                        'href="./saveface.css">' + \
-                        '<title>SaveFacePie</title>' + \
-                        '</head><body>{}' + \
-                        '</body></html>'
+default_html_template = """<!doctype html>
+                           <html lang='en'>
+                           <head>
+                           <meta charset="utf-8"/>
+                           <link rel="shortcut icon" href="./favicon.ico">
+                           <link rel="stylesheet" href="./saveface.css">
+                           <title>SaveFacePie</title>
+                           <script src="./resources/jquery-3.3.1.min.js"></script>
+                           <script>
+                           $(document).ready(function()
+    {{
+       $(".display").on("error", function(){{
+           $(this).attr('src', './resources/sf_notfound.png');
+       }}
+       );
+    }});
+                           </script>
+                           </head><body>{}
+                           </body></html>"""
 
 
 class SaveFaceFormatterJSON(SaveFaceFormatter):
@@ -130,6 +142,7 @@ class SaveFaceFormatterXML(SaveFaceFormatterJSON):
         super().__init__(formatter_func)
         self._xml = ET.fromstring('<content><items></items></content>')
         self._template = default_xml_template
+        self._O_Auth = None
 
     @property
     def template(self):
@@ -155,6 +168,9 @@ class SaveFaceFormatterXML(SaveFaceFormatterJSON):
         for el in rn.iter():
             if el.text:
                 el.text = ftfy.fix_text_segment(el.text, fix_entities='auto', remove_terminal_escapes=True, fix_encoding=True, fix_latin_ligatures=True, fix_character_width=True, uncurl_quotes=True, fix_line_breaks=True, fix_surrogates=True, remove_control_chars=True, remove_bom=True, normalization='NFKC')
+        # remove non breaking space code
+        for p in self._xml.itertext():
+                re.sub(r'ğŸ', '', p)
         try:
             p = self._xml.findall('.//headers/..')
             for e in p:
@@ -167,7 +183,7 @@ class SaveFaceFormatterXML(SaveFaceFormatterJSON):
                 e.remove(e.find('./paging'))
         except AttributeError:
             pass
-        if isinstance(self, SaveFaceFormatterXML):
+        if self.__class__.__name__ is 'SaveFaceFormatterXML':
             if self._formatter_func is not None:
                 self._xml = self._formatter_func(self._xml)
 
@@ -177,10 +193,21 @@ class SaveFaceFormatterXML(SaveFaceFormatterJSON):
 
 # this can be subclassed for different request strings
 class SaveFaceFormatterHTML(SaveFaceFormatterXML):
-    def __init__(self, formatter_func=None, divs=True):
+
+    def __init__(self, formatter_func=None, divs=True, graph=None):
         super().__init__(formatter_func)
         self._template = default_html_template
         self._divs = divs
+        self._graph = graph
+        self._not_found_image = './resources/sf_notfound.png'
+
+    @property
+    def not_found_image(self):
+        return self._not_found_image
+
+    @not_found_image.setter
+    def not_found_image(self, img):
+        self._not_found_image = img
 
     @property
     def template(self):
@@ -200,10 +227,20 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
         src = None
 
         def fbcdn(el):
-            el.text = 'https://graph.facebook.com/' + \
-                re.search(r'(?<=_)([0-9]+)',
-                          el.text).group(0) + \
-                '/picture'
+            if requests.get(el.text).ok:
+                return
+            elif requests.get(el.text).status_code is 403:
+                el.text = self._not_found_image
+            # else:
+            #     try:
+            #         el.text = self._graph.get(
+            #             re.search(r'(?<=_)([0-9]+)',
+            #                       el.text).group(0) + '?fields=picture')['picture']
+            #     except (fpexceptions.OAuthError,
+            #             fpexceptions.FacebookError,
+            #             fpexceptions.FacepyError) as e:
+            #         self.log(msg=str(e), level='critical',
+            #                  exception=e, std_out=True, to_disk=False)
 
         def remove_trailing(el):
             for j in ['jpg', 'png', 'gif', 'mp4', 'jpeg']:
@@ -220,16 +257,22 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
             except TypeError:
                 pass
 
+        def imgurl(el):
+            if el.text is not None and el.text is not '':
+                if 'scontent.xx.fbcdn.net' in el.text:
+                    fbcdn(el)
+                if 'external.xx.fbcdn.net' in el.text:
+                    if 'http' in el.text:
+                        el.text = 'http' + el.text.split('http')[-1]
+                    elif 'https' in el.text:
+                        el.text = 'https' + el.text.split('https')[-1]
+                    remove_trailing(el)
+
         for p in self._xml.findall('.//picture/..'):
             p.remove(p.find('./picture/.'))
 
         for el in self._xml.findall('.//full_picture'):
-            if 'scontent.xx.fbcdn.net' in el.text:
-                fbcdn(el)
-            elif 'url=' in el.text:
-                el.text = 'https' + el.text.split('https')[-1]
-                remove_trailing(el)
-                unesc(el)
+            imgurl(el)
             el.insert(0, ET.Element('img', attrib={'class': 'image',
                                                'src': el.text}))
             el.text = None
@@ -239,19 +282,10 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
             height = ''
             width = ''
             try:
-                src = el.find('.//src')
-                if src.text is not None and src.text is not '':
-                    if 'scontent.xx.fbcdn.net' in src.text:
-                        fbcdn(src)
-                    if 'url=' in src.text:
-                        if 'https' in src.text:
-                            src.text = 'https' + src.text.split('https')[-1]
-                        elif 'http' in src.text:
-                            src.text = 'http' + src.text.split('http')[-1]
-                        remove_trailing(src)
-                    unesc(src)
-                    height = el.find('.//height').text
-                    width = el.find('.//width').text
+                src = el.find('src')
+                imgurl(src)
+                height = el.find('.//height').text
+                width = el.find('.//width').text
             except AttributeError:
                 pass
             try:
@@ -259,8 +293,6 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
                 if link.text is not None and link.text is not '':
                     if 'u=' in link.text:
                         link.text = link.text.split('u=')[1]
-                    link.text = urllib.parse.unquote(link.text)
-                    link.text = urllib.parse.quote(link.text, safe='')
             except AttributeError:
                 pass
             try:
@@ -279,22 +311,6 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
                 elp.remove(elp.find('./url'))
             except (TypeError, ValueError):
                 pass
-            # try:
-            #     el.remove(el.find('./height'))
-            # except (TypeError, ValueError):
-            #     pass
-            # try:
-            #     el.remove(el.find('./width'))
-            # except (TypeError, ValueError):
-            #     pass
-            # try:
-            #     el.remove(el.find('./src'))
-            # except (TypeError, ValueError):
-            #     pass
-            # try:
-            #     el.remove(el.find('./img'))
-            # except (TypeError, ValueError):
-            #     pass
 
             if link is None:
                 linkn = None
@@ -303,12 +319,19 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
                     claaz = 'link'
                 else:
                     claaz = 'img link'
+                unesc(link)
                 linktext = f'href="{link.text}"'
                 linkn = ET.XML(f'<a {linktext} class="{claaz}"><\\a>')
                 linkn.text = 'Image Source'
 
             if src is not None and src.text is not '':
-                imgn = ET.XML(f'<img height="{height}" width="{width}" src="{src.text}" class="img"/>')
+                try:
+                    unesc(src)
+                    imgn = ET.XML(f'<img height="{height}" width="{width}" src="{src.text}" class="display img"/>')
+                except ET.ParseError:
+                    import pdb; pdb.set_trace()  # breakpoint 8879785e //
+                    self.log(msg=str(e), level='critical',
+                             exception=e, std_out=True, to_disk=False)
                 if linkn is not None:
                     linkn.text = ''
                     linkn.append(imgn)
@@ -325,8 +348,10 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
                     el.attrib = {'class': el.tag, **el.attrib}
                     el.tag = 'div'
 
-        import pdb; pdb.set_trace()  # breakpoint a073442b //
-        if isinstance(self, SaveFaceFormatterHTML):
+        for elt in self._xml.itertext():
+            re.subn(u'\u0000-\u0020', re_remove_control_characters, elt)
+
+        if self.__class__.__name__ is 'SaveFaceFormatterHTML':
             if self._formatter_func is not None:
                 self._xml = self._formatter_func(self._xml)
 
@@ -351,42 +376,6 @@ def xmlformat(xmltree):
 
 def htmlformat(xmltree):
 
-        # if i.find('./media') is not None:
-        #     i.remove(i.find('./media'))
-        # j = i.find('url')
-        # if j is not None and j.text is not None:
-        #     if i.find('./title') is not None:
-        #         title = i.find('./title').text
-        #     else:
-        #         title = "iframe"
-        #     e = ET.Element('iframe', attrib={'src': j.text,
-        #                                      'title': title,
-        #                                      'class': 'iframe',
-        #                                      'sandbox': ''})
-        #     e.text = "iframe  :  " + j.text
-        #     i.remove(j)
-        #     i.append(e)
-        #     if i.find('./target') is not None:
-        #         i.remove(i.find('./target'))
-        # else:
-        #     j = i.find('target')
-        #     if j is not None and j.text is not None:
-        #         if i.find('./title') is not None:
-        #             title = i.find('./title').text
-        #         else:
-        #             title = "iframe"
-        #         e = ET.Element('iframe', attrib={'src': j.text,
-        #                                          'title': title,
-        #                                          'class': iframe,
-        #                                          'sandbox': ''})
-        #         e.text = "iframe  :  " + j.text
-        #         i.remove(j)
-        #         i.append(e)
-        #         if i.find('./url') is not None:
-        #             title = i.find('./url')
-        #         else:
-        #             title = "iframe"
-
     for i in xmltree.findall('.//items/.'):
         e = ET.Element('p', attrib={'class': 'posts-title'})
         inner = ET.Element('strong')
@@ -401,21 +390,21 @@ def htmlformat(xmltree):
         e.append(inner)
         i.insert(0, e)
 
-    if xmltree.findall('.//photos/.'):
-        for i in xmltree.findall('.//picture/..'):
-            pid = i.find('./id')
-            if pid.text is not None:
-                a = ET.Element('a',
-                               attrib={'class': 'photo-link',
-                                       'href': 'https://www.facebook.com/photo.php?fbid=' +
-                                       pid.text,
-                                       'name': pid.text})
-                a.text = 'picture id : ' + pid.text
-                pid.insert(0, a)
-                pid.text = None
-                pid.tag = 'photo-id'
-        for i in xmltree.findall('.//photos/data/item'):
-            i.tag = 'photo'
+    # if xmltree.findall('.//photos/.'):
+    #     for i in xmltree.findall('.//picture/..'):
+    #         pid = i.find('./id')
+    #         if pid.text is not None:
+    #             a = ET.Element('a',
+    #                            attrib={'class': 'photo-link',
+    #                                    'href': 'https://www.facebook.com/photo.php?fbid=1764324840301758+
+    #                                    pid.text,
+    #                                    'name': pid.text})
+    #             a.text = 'picture id : ' + pid.text
+    #             pid.insert(0, a)
+    #             pid.text = None
+    #             pid.tag = 'photo-id'
+    #     for i in xmltree.findall('.//photos/data/item'):
+    #         i.tag = 'photo'
 
     for i in xmltree.findall('.//item/comment/id/.'):
         e = ET.Element('p', attrib={'class': 'comment-id'})
