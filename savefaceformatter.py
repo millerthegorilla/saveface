@@ -227,10 +227,14 @@ class SaveFaceFormatterHTML(SaveFaceFormatterXML):
         src = None
 
         def fbcdn(el):
-            if requests.get(el.text).ok:
-                return
-            elif requests.get(el.text).status_code is 403:
-                el.text = self._not_found_image
+            try:
+                if requests.get(el.text).ok:
+                    return
+                elif requests.get(el.text).status_code is 403:
+                    el.text = self._not_found_image
+            except requests.exceptions.ConnectionError:
+                print('unable to make connection to facebook.  Are you offline?  Continuing.')
+                pass
             # else:
             #     try:
             #         el.text = self._graph.get(
